@@ -1,5 +1,5 @@
-// DRACOSIS ENCODER
-// Written by Shaw for XR3ngine
+// Uvol ENCODER
+// Written by Ethereal Engine
 // MIT licensed
 
 // This encoder uses Corto for quantized mesh compression

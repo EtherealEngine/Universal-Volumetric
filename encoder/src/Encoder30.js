@@ -1,4 +1,4 @@
-// DRACOSIS ENCODER
+// UVol ENCODER
 // Written by Shaw for XR3ngine
 // MIT licensed
 

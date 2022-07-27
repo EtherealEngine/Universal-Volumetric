@@ -1,10 +1,10 @@
 {
-  "name": "@xr3ngine/volumetric",
+  "name": "@xrfoundation/Universal-Volumetric",
   "version": "0.2.0",
   "private": true,
   "repository": {
     "type": "git",
-    "url": "git://github.com/xr3ngine/xr3ngine.git"
+    "url": "git://github.com/xrfoundation/Universal-Volumetric.git"
   },
   "engines": {
     "yarn": ">= 0.18.0"
@@ -12,15 +12,15 @@
   "npmClient": "yarn",
   "jest": "ts-jest",
   "scripts": {
-    "corto": "babel ./src/libs/cortodecoder.js --out-file corto.js --plugins @@babel/plugin-transform-modules-umd"
+    "encode": "babel ./src/libs/cortodecoder.js --out-file corto.js --plugins @@babel/plugin-transform-modules-umd"
   },
-  "author": "XR3 Group",
+  "author": "Ethereal Engine",
   "license": "MIT",
   "type": "module",
   "bugs": {
-    "url": "https://github.com/xr3ngine/three-volumetric/issues"
+    "url": "https://github.com/xrfoundation/three-volumetric/issues"
   },
-  "homepage": "https://github.com/xr3ngine/xr3ngine/packages/volumetric#readme",
+  "homepage": "https://github.com/xrfoundation/Universal-Volumetri#readme",
   "devDependencies": {
     "@babel/cli": "^7.12.10",
     "@babel/core": "^7.12.10",

@@ -14,8 +14,8 @@ import {
   KeyframeBuffer
 } from './Interfaces';
 import RingBuffer from './RingBuffer';
-import { Engine, VideoTexture } from '@xr3ngine/engine/src/ecs/classes/Engine';
-import { EngineEvents } from '@xr3ngine/engine/src/ecs/classes/EngineEvents';
+import { Engine, VideoTexture } from '@xrengine/engine/src/ecs/classes/Engine';
+import { EngineEvents } from '@xrengine/engine/src/ecs/classes/EngineEvents';
 
 export default class DracosisPlayer {
   // Public Fields

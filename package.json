@@ -1,9 +1,9 @@
 {
-  "name": "volumetric",
-  "version": "0.6.2",
+  "name": "Universal-Volumetric",
+  "version": "0.7.0",
   "repository": {
     "type": "git",
-    "url": "git://github.com/XRFoundation/volumetric.git"
+    "url": "git://github.com/XRFoundation/Universal-Volumetric.git"
   },
   "exports": {
     "./player": {
@@ -26,14 +26,14 @@
     "build": "npm run build-player && npm run build-worker",
     "build-player": "tsc",
     "build-worker": "vite build --config vite.worker.config.ts",
-    "corto": "babel ./web/libs/cortodecoder.js --out-file corto.js --plugins @babel/plugin-transform-modules-umd"
+    "encode": "babel ./encoder/Encoder.js --out-file corto.js --plugins @babel/plugin-transform-modules-umd"
   },
   "author": "XRFoundation",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/XRFoundation/volumetric/issues"
+    "url": "https://github.com/XRFoundation/Universal-Volumetric/issues"
   },
-  "homepage": "https://github.com/XRFoundation/volumetric#readme",
+  "homepage": "https://github.com/XRFoundation/Universal-Volumetric#readme",
   "devDependencies": {
     "@babel/cli": "7.18.9",
     "@babel/core": "7.18.9",
