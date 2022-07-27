@@ -1,0 +1,40 @@
+{
+  "name": "@xr3ngine/volumetric",
+  "version": "0.2.0",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/xr3ngine/xr3ngine.git"
+  },
+  "engines": {
+    "yarn": ">= 0.18.0"
+  },
+  "npmClient": "yarn",
+  "jest": "ts-jest",
+  "scripts": {
+    "corto": "babel ./src/libs/cortodecoder.js --out-file corto.js --plugins @@babel/plugin-transform-modules-umd"
+  },
+  "author": "XR3 Group",
+  "license": "MIT",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/xr3ngine/three-volumetric/issues"
+  },
+  "homepage": "https://github.com/xr3ngine/xr3ngine/packages/volumetric#readme",
+  "devDependencies": {
+    "@babel/cli": "^7.12.10",
+    "@babel/core": "^7.12.10",
+    "@babel/plugin-transform-modules-commonjs": "^7.12.1",
+    "@types/glob": "^7.1.2",
+    "ts-loader": "^8.0.5",
+    "ts-node": "^8.10.2",
+    "typescript": "^4.0.3"
+  },
+  "dependencies": {
+    "esm": "^3.2.25",
+    "http-range-fetcher": "^1.2.4",
+    "three": "^0.125.0",
+    "three-obj-loader-cjs-module": "^1.0.0",
+    "xmlhttprequest": "^1.8.0"
+  }
+}
