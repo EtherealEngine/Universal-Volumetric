@@ -21,10 +21,8 @@ enum PlayModeEnum {
 }
 
 enum VideoStatusEnum {
-  Wait = "wait",
   Set = "set",
   Loaded = "loaded",
-  InitPlay = "initplay",
   Ready = "ready"
 }
 
@@ -224,7 +222,7 @@ export default class Player {
     });
 
     const handleVideoFrame = (now, metadata) => {
-      if (this.videoStatus != VideoStatusEnum.InitPlay && !this.video.paused && this.hasPlayed) {
+      if (this.videoStatus === VideoStatusEnum.Ready && !this.video.paused && this.hasPlayed) {
         this._video.playbackRate = this.speed
         const frameData = this.frameData.filter((rate) => rate.track == this.currentTrack)
         let frameRate = this.defaultFrameRate
@@ -427,9 +425,9 @@ export default class Player {
 
     const hasFrame = this.meshBuffer.has(frameToPlay);
 
-    if (!hasFrame || this.stopOnNextFrame) {
+    if (!hasFrame) {
       if (!this._video.paused) {
-        this.pause(!this.stopOnNextFrame)
+        this.pause(true)
       }
       if (!hasFrame && typeof this.onMeshBuffering === "function") {
         this.onMeshBuffering(0);
@@ -452,6 +450,8 @@ export default class Player {
       this.sendHandleEvent(PlayerEventEnum.FrameUpdate, frameToPlay)
       if(this.rendererCallback) this.rendererCallback();
       if(cb) cb();
+
+      if (this.stopOnNextFrame) this.pause()
     }
     this.removePlayedBuffer()
   }
@@ -628,6 +628,7 @@ export default class Player {
   // Start loop to check if we're ready to play
   play(mute?: boolean) {
     this.hasPlayed = true
+    // TODO this is all not very data-oriented; we should only be running logic in the bufferLoop.
     if (this.videoStatus != VideoStatusEnum.Loaded
         && this.videoStatus != VideoStatusEnum.Ready) return
     this._video.muted = mute
@@ -641,7 +642,6 @@ export default class Player {
   }
 
   pause(isWait?: boolean) {
-    if (this.videoStatus == VideoStatusEnum.InitPlay) return
     this.paused = true
     if (!isWait) {this.hasPlayed = false}
     this.sendHandleEvent(PlayerEventEnum.Pause)
@@ -654,9 +654,8 @@ export default class Player {
   }
 
   handleInitPlay() {
-    this.pause()
     this.mesh.visible = true
-    this.videoStatus = VideoStatusEnum.InitPlay
+    this.videoStatus = VideoStatusEnum.Ready
     this.sendHandleEvent(PlayerEventEnum.VideoStatus, { status: this.videoStatus, video: this._video })
   }
 
