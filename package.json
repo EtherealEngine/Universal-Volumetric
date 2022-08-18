@@ -1,6 +1,6 @@
 {
-  "name": "Universal-Volumetric",
-  "version": "0.7.0",
+  "name": "@xrfoundation/volumetric",
+  "version": "1.0.0",
   "repository": {
     "type": "git",
     "url": "git://github.com/XRFoundation/Universal-Volumetric.git"
