@@ -34,7 +34,7 @@ function startHandlerLoop({
 
       try {
         const startFrameData = _fileHeader.frameData[frameStart];
-        const endFrameData = _fileHeader.frameData[frameEnd];
+        const endFrameData = _fileHeader.frameData[frameEnd-1];
         const requestStartBytePosition = startFrameData.startBytePosition;
         const requestEndBytePosition = endFrameData.startBytePosition + endFrameData.meshLength;
 
@@ -49,7 +49,7 @@ function startHandlerLoop({
         const buffer = await (response as Response).arrayBuffer()
 
         const transferables = []
-        for (let i = frameStart; i <= frameEnd; i++) {
+        for (let i = frameStart; i < frameEnd; i++) {
           const currentFrameData = _fileHeader.frameData[i];
 
           const fileReadStartPosition = currentFrameData.startBytePosition - startFrameData.startBytePosition;
@@ -82,6 +82,7 @@ function startHandlerLoop({
 (globalThis as any).onmessage = function (e) {
   if (e.data.type === 'initialize')
   {
+    messageQueue.length = 0
     if (timer) clearInterval(timer);
     startHandlerLoop(e.data.payload);
   }
