@@ -12,6 +12,7 @@ export interface IFileHeader {
     maxVertices: number;
     maxTriangles: number;
     frameData: IFrameData[];
+    frameRate: number;
 }
 
 export interface KeyframeBuffer {
