@@ -1,3 +1,7 @@
-for file in *.obj; do
-    meshlabserver -i "$file" -o "${file%.*}.ply" -m wt
-done
+INPUT_PATH=../input
+OUTPUT_PATH=../output
+
+python convert.py -- $INPUT_PATH $OUTPUT_PATH
+
+
+

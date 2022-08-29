@@ -1,3 +1,6 @@
+input/
+output/
+
 dist
 # Logs
 logs
