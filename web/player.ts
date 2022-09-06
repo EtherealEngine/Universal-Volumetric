@@ -13,11 +13,11 @@ import {
 } from 'three';
 import { IFileHeader } from './Interfaces';
 
-enum PlayModeEnum {
-  Single = 1,
-  Random,
-  Loop,
-  SingleLoop,
+export enum PlayMode {
+  single = 'single',
+  random = 'random',
+  loop = 'loop',
+  singleloop = 'singleloop',
 }
 
 type onMeshBufferingCallback = (progress: number) => void;
@@ -36,7 +36,7 @@ export default class Player {
   public encoderWindowSize = 8; // length of the databox
   public encoderByteLength = 16;
   public videoSize = 1024;
-  public playMode: PlayModeEnum;
+  public playMode: PlayMode;
   public waitForVideoLoad = 3 //3 seconds
   public autoPreview = true
   public targetFramesToRequest = 90;
@@ -102,12 +102,12 @@ export default class Player {
     worker = null
   }: {
     renderer: WebGLRenderer,
-    playMode?: PlayModeEnum,
+    playMode?: PlayMode,
     paths: Array<string>,
     encoderWindowSize?: number,
     encoderByteLength?: number,
     videoSize?: number,
-    video?: any,
+    video?: HTMLVideoElement,
     onMeshBuffering?: onMeshBufferingCallback
     onFrameShow?: onFrameShowCallback,
     worker?: Worker
@@ -126,7 +126,18 @@ export default class Player {
     this._worker = worker ? worker : (new Worker(Player.defaultWorkerURL)); // spawn new worker;
 
     this.paths = paths
-    this.playMode = playMode || PlayModeEnum.Loop
+
+    // backwards-compat
+    if (typeof playMode === 'number') {
+      switch (playMode) {
+        case 1 : playMode = PlayMode.single; break;
+        case 2 : playMode = PlayMode.random; break;
+        case 3 : playMode = PlayMode.loop; break;
+        case 4 : playMode = PlayMode.singleloop; break;
+      }
+    }
+
+    this.playMode = playMode || PlayMode.loop
     
     //create video element
     this._video = video ? video : document.createElement('video')
@@ -304,15 +315,15 @@ export default class Player {
   }
 
   prepareNextLoop() {
-    if (this.playMode == PlayModeEnum.Random) {
+    if (this.playMode == PlayMode.random) {
       this.nextTrack = Math.floor(Math.random() * this.paths.length)
-    } else if (this.playMode == PlayModeEnum.Single) {
+    } else if (this.playMode == PlayMode.single) {
       this.nextTrack = (this.currentTrack + 1) % this.paths.length
       if ((this.currentTrack + 1) == this.paths.length) {
         this.nextTrack = 0
         this.isWorkerReady = false
       }
-    } else if (this.playMode == PlayModeEnum.SingleLoop) {
+    } else if (this.playMode == PlayMode.singleloop) {
       this.nextTrack = this.currentTrack
     } else { //PlayModeEnum.Loop
       this.nextTrack = (this.currentTrack + 1) % this.paths.length
@@ -354,7 +365,9 @@ export default class Player {
   }
 
   setTrackPath(track) {
-    this.video.src = this.paths[track % this.paths.length].replace('.drcs', '.mp4')
+    const path = this.paths[track % this.paths.length]
+    if (!path) return
+    this.video.src = path.replace('.drcs', '.mp4').replace('.uvol', '.mp4')
     this.video.load()
   }
 
