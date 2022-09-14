@@ -1,0 +1,4 @@
+**/node_modules/**
+web/Interfaces.ts
+web/corto.ts
+**/*.d.ts
