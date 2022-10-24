@@ -167,7 +167,7 @@ export default class Player {
 
     const handleVideoFrame = (now, metadata) => {
       this._video.requestVideoFrameCallback(handleVideoFrame)
-      if (!this.useVideoRequestCallback) return
+      if (!this.useVideoRequestCallback || !this.fileHeader) return
       const frameToPlay = Math.round(metadata.mediaTime * this.fileHeader.frameRate)
       this.processFrame(frameToPlay)
     }
