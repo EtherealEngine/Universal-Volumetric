@@ -55,7 +55,7 @@
   },
   "dependencies": {
     "shelljs": "0.8.5",
-    "vite": "^3.0.0",
+    "vite": "^4.0.0",
     "xmlhttprequest": "1.8.0"
   },
   "peerDependencies": {
