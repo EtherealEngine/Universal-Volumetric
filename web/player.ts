@@ -168,6 +168,7 @@ export default class Player {
     const handleVideoFrame = (now, metadata) => {
       this._video.requestVideoFrameCallback(handleVideoFrame)
       if (!this.useVideoRequestCallback || !this.fileHeader) return
+      this.bufferLoop()
       const frameToPlay = Math.round(metadata.mediaTime * this.fileHeader.frameRate)
       this.processFrame(frameToPlay)
     }
@@ -240,7 +241,6 @@ export default class Player {
 
   bufferLoop = () => {
     if (!this.video) return // has been disposed
-    requestAnimationFrame(() => this.bufferLoop())
 
     const minimumBufferLength = this.targetFramesToRequest * 2
     const meshBufferHasEnoughToPlay = this.meshBuffer.size >= minimumBufferLength * 3
@@ -443,6 +443,7 @@ export default class Player {
   }
 
   update() {
+    this.bufferLoop()
     if (!this.fileHeader || this.useVideoRequestCallback || this.video.paused) return
     const frame = this.drawVideoAndGetCurrentFrameNumber()
     this.processFrame(frame)
