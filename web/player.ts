@@ -67,6 +67,7 @@ export default class Player {
   public bufferGeometry: BufferGeometry
   public failMaterial?: MeshBasicMaterial
 
+  _hasPlayed: boolean = false
   // Private Fields
   private _video: HTMLVideoElement = null
   private _videoTexture: Texture = null
@@ -155,7 +156,7 @@ export default class Player {
     this._video.playsInline = true
     this._video.preload = 'auto'
     this._video.muted = false
-    this._video.autoplay = true
+    this._video.autoplay = false
 
     this.video.addEventListener('loadstart', () => {
       for (const buffer of this.meshBuffer.values()) buffer?.dispose()
@@ -271,7 +272,7 @@ export default class Player {
     //play only when buffer goes to fill to enough
     if (meshBufferHasEnoughToPlay) {
       this.video.playbackRate = this.speed
-      if (this.video.autoplay && this.video.paused) this.video.play()
+      if (this._hasPlayed && this.video.paused) this.video.play()
     }
 
     if (this.video.ended) this.prepareNextLoop()
@@ -282,6 +283,7 @@ export default class Player {
    */
   processFrame(frameToPlay: number) {
     this.currentVideoFrame = frameToPlay
+    this._hasPlayed = true
 
     if (frameToPlay > this.numberOfFrames) {
       // console.warn('mesh buffer is not ready? frameToPlay:', frameToPlay)
