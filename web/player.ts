@@ -38,10 +38,7 @@ export type PlayerConstructorArgs = {
 }
 
 export default class Player {
-  static defaultWorkerURL = new URL('./worker.build.es.js', import.meta.url).href
-  //TODO: testing worker
-  // static defaultWorkerURL = new URL('../../../XREngine/node_modules/volumetric/dist/worker.build.es.js', import.meta.url).href
-  // static defaultWorkerURL = new URL('../../../node_modules/volumetric/dist/worker.build.es.js', import.meta.url).href
+  static defaultWorkerURL = new URL('./worker.js', import.meta.url).href
 
   // Public Fields
   public renderer: WebGLRenderer
