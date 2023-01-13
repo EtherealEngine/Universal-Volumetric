@@ -10,7 +10,7 @@
       "import": "./dist/player.js"
     },
     "./worker": {
-      "default": "./dist/worker.build.es.js"
+      "default": "./dist/worker.js"
     },
     ".": {}
   },
