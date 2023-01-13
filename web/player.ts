@@ -38,7 +38,7 @@ export type PlayerConstructorArgs = {
 }
 
 export default class Player {
-  static defaultWorkerURL = new URL('./worker.js', import.meta.url).href
+  static defaultWorkerURL = new URL('./worker.build.mjs', import.meta.url).href
 
   // Public Fields
   public renderer: WebGLRenderer
@@ -121,7 +121,8 @@ export default class Player {
     this.maxNumberOfFrames = Math.pow(2, this.encoderByteLength) - 2
     this.videoSize = videoSize
 
-    this._worker = worker ? worker : new Worker(Player.defaultWorkerURL) // spawn new worker;
+    this._worker = worker ? worker : new Worker(Player.defaultWorkerURL, { type: 'module', name: 'UVOL' }) // spawn new worker;
+    this._worker.onerror = console.error
 
     this.paths = paths
 
