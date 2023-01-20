@@ -233,7 +233,7 @@ export default class Player {
       else if (this.nextFrameToRequest === i) bufferRepresentation += '+'
       else bufferRepresentation += '-'
     }
-    console.log(bufferRepresentation)
+    // console.log(bufferRepresentation)
   }
 
   bufferLoop = () => {

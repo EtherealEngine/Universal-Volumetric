@@ -13,7 +13,7 @@ const messageQueue: requestPayload[] = []
 
 function addMessageToQueue(payload: requestPayload) {
   messageQueue.push(payload)
-  console.log('Message added to queue', payload)
+  // console.log('Message added to queue', payload)
 }
 
 function startHandlerLoop({ meshFilePath, fileHeader }) {
