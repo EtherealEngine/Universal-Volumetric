@@ -434,6 +434,7 @@ export default class Player {
     //remove played buffer
     for (const [key, buffer] of this.meshBuffer.entries()) {
       if (key < currentFrame) {
+        buffer.dispose()
         this.meshBuffer.delete(key)
       }
     }
