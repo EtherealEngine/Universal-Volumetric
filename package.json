@@ -46,8 +46,8 @@
   },
   "homepage": "https://github.com/XRFoundation/Universal-Volumetric#readme",
   "devDependencies": {
-    "@babel/cli": "7.19.3",
-    "@babel/core": "7.19.6",
+    "@babel/cli": "7.20.7",
+    "@babel/core": "7.20.12",
     "@types/three": "0.149.0",
     "@ianvs/prettier-plugin-sort-imports": "3.7.1",
     "prettier": "2.8.0",
