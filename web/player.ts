@@ -31,6 +31,8 @@ export type PlayerConstructorArgs = {
   encoderByteLength?: number
   videoSize?: number
   video?: HTMLVideoElement
+  meshFilePath?: string
+  manifestFilePath?: string
   onMeshBuffering?: onMeshBufferingCallback
   onFrameShow?: onFrameShowCallback
   worker?: Worker
@@ -106,6 +108,8 @@ export default class Player {
     encoderByteLength = 16,
     videoSize = 1024,
     video = null,
+    meshFilePath = null,
+    manifestFilePath = null,
     onMeshBuffering = null,
     onFrameShow = null,
     worker = null,
@@ -121,8 +125,14 @@ export default class Player {
     this.maxNumberOfFrames = Math.pow(2, this.encoderByteLength) - 2
     this.videoSize = videoSize
 
-    this._worker = worker ? worker : new Worker(Player.defaultWorkerURL, { type: 'module', name: 'UVOL' }) // spawn new worker;
-    this._worker.onerror = console.error
+    console.log('worker exists', worker)
+    try {
+      this._worker = worker ? worker : new Worker(Player.defaultWorkerURL, {type: 'module', name: 'UVOL'}) // spawn new worker;
+      this._worker.onerror = console.error
+    } catch(err) {
+      console.error(err)
+      throw err
+    }
 
     this.paths = paths
 
@@ -145,9 +155,13 @@ export default class Player {
     }
 
     this.playMode = playMode || PlayMode.loop
-
     //create video element
     this._video = video ? video : document.createElement('video')
+    console.log('PLAYER INPUT', manifestFilePath, meshFilePath)
+    this.meshFilePath = meshFilePath || this.video.src.replace('.mp4', '.drcs')
+    this.manifestFilePath = manifestFilePath || this.video.src.replace('.mp4', '.manifest')
+    console.log('this.meshFilePath', this.meshFilePath)
+    console.log('this.manifestFilePath', this.manifestFilePath)
     this._video.crossOrigin = 'anonymous'
     this._video.playbackRate = 0
     this._video.playsInline = true
@@ -398,8 +412,6 @@ export default class Player {
   }
 
   resetWorker() {
-    const manifestFilePath = (this.manifestFilePath = this.video.src.replace('.mp4', '.manifest'))
-    const meshFilePath = (this.meshFilePath = this.video.src.replace('.mp4', '.drcs'))
     this.isWorkerReady = false
     const xhr = new XMLHttpRequest()
     xhr.onreadystatechange = () => {
@@ -419,14 +431,15 @@ export default class Player {
         type: 'initialize',
         payload: {
           targetFramesToRequest: this.targetFramesToRequest,
-          meshFilePath,
+          meshFilePath: this.meshFilePath,
           numberOfFrames: this.numberOfFrames,
           fileHeader: this.fileHeader
         }
       }) // Send data to our worker.
     }
 
-    xhr.open('GET', manifestFilePath, true) // true for asynchronous
+    console.log('FETCHING MANIFEST', this.manifestFilePath, this.meshFilePath)
+    xhr.open('GET', this.manifestFilePath, true) // true for asynchronous
     xhr.send()
   }
 
