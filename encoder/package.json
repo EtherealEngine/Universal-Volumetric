@@ -22,9 +22,9 @@
   },
   "homepage": "https://github.com/xrfoundation/Universal-Volumetri#readme",
   "devDependencies": {
-    "@babel/cli": "7.20.7",
-    "@babel/core": "7.20.12",
-    "@babel/plugin-transform-modules-commonjs": "7.20.11",
+    "@babel/cli": "7.21.0",
+    "@babel/core": "7.21.0",
+    "@babel/plugin-transform-modules-commonjs": "7.21.2",
     "@types/glob": "8.0.1",
     "ts-loader": "9.4.2",
     "ts-node": "10.9.1",
