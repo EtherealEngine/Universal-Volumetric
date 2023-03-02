@@ -1,10 +1,10 @@
 {
-  "name": "@xrfoundation/Universal-Volumetric",
+  "name": "@etherealengine/Universal-Volumetric",
   "version": "0.2.0",
   "private": true,
   "repository": {
     "type": "git",
-    "url": "git://github.com/xrfoundation/Universal-Volumetric.git"
+    "url": "git://github.com/etherealengine/Universal-Volumetric.git"
   },
   "engines": {
     "yarn": ">= 0.18.0"
@@ -18,9 +18,9 @@
   "license": "MIT",
   "type": "module",
   "bugs": {
-    "url": "https://github.com/xrfoundation/three-volumetric/issues"
+    "url": "https://github.com/etherealengine/three-volumetric/issues"
   },
-  "homepage": "https://github.com/xrfoundation/Universal-Volumetri#readme",
+  "homepage": "https://github.com/etherealengine/Universal-Volumetri#readme",
   "devDependencies": {
     "@babel/cli": "7.19.3",
     "@babel/core": "7.19.6",
