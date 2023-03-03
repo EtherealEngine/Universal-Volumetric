@@ -40,8 +40,8 @@ jobs:
         run: echo pr_branch_name=version-increment-${{ github.event.release.tag_name }} >> $GITHUB_ENV
       - name: Switch to branch ${{ env.pr_branch_name }}
         run: git switch -c ${{ env.pr_branch_name }}
-      - name: Lerna increment version
-        run: npm run version-increment-no-tag ${{ github.event.release.tag_name }}
+      - name: NPM increment version
+        run: npm version ${{ github.event.release.tag_name }}
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
@@ -63,12 +63,6 @@ jobs:
         run: npm run publish-no-verify
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Update package repo to GitHub Packages
-        run: npm run update-name-gh-package
-      - name: Run git add
-        run: git add .
-      - name: Commit changes
-        run: git commit -m 'GH Packages'
       - name: Config npm registry token
         run: npm config set '//npm.pkg.github.com/:_authToken' "${NPM_TOKEN}"
         env:

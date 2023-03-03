@@ -32,7 +32,9 @@
     "encode": "babel ./encoder/Encoder.js --out-file corto.js --plugins @babel/plugin-transform-modules-umd",
     "format": "prettier --write \"web/*.{ts,tsx}\"",
     "format-staged": "lint-staged",
-    "lint": "prettier --check \"web/*.{ts,tsx}\""
+    "lint": "prettier --check \"web/*.{ts,tsx}\"",
+    "publish-no-verify": "npm publish --yes --ignore-scripts",
+    "publish-github": "npm publish --yes --ignore-scripts --registry https://npm.pkg.github.com"
   },
   "pre-commit": [
     "format-staged"
