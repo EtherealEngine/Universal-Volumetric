@@ -58,6 +58,10 @@ jobs:
           source_branch: ${{ env.pr_branch_name }}
           pr_title: ${{ github.event.release.tag_name }}
           pr_body: Bump version to ${{ github.event.release.tag_name }}
+      - name: Install node modules
+        run: npm i
+      - name: Build dist
+        run: npm run build
       - name: Publish to npm
         run: npm run publish-npm
         env:
