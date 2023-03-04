@@ -1,6 +1,6 @@
 {
-  "name": "@etherealengine/volumetric",
-  "version": "1.0.13",
+  "name": "Ethereal Engine: Universal Volumetric",
+  "version": "1.0.11",
   "repository": {
     "type": "git",
     "url": "git://github.com/etherealengine/Universal-Volumetric.git"
@@ -14,9 +14,6 @@
     },
     ".": {}
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "files": [
     "dist",
     "player.d.ts",
@@ -25,7 +22,7 @@
   "npmClient": "yarn",
   "jest": "ts-jest",
   "scripts": {
-    "patch-npm": "npm version patch && npm publish",
+    "patch-npm": "npm version patch && npm publish --access public",
     "build": "npm run build-player && npm run build-worker",
     "build-player": "tsc",
     "build-worker": "vite build --config vite.worker.config.ts",
@@ -44,15 +41,10 @@
       "prettier --write"
     ]
   },
-  "author": "EtherealEngine",
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/etherealengine/Universal-Volumetric/issues"
-  },
-  "homepage": "https://github.com/etherealengine/Universal-Volumetric#readme",
   "devDependencies": {
-    "@babel/cli": "7.20.7",
-    "@babel/core": "7.20.12",
+    "@babel/cli": "7.21.0",
+    "@babel/core": "7.21.0",
     "@types/three": "0.149.0",
     "@ianvs/prettier-plugin-sort-imports": "3.7.1",
     "prettier": "2.8.4",

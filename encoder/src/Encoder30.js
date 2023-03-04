@@ -1,5 +1,4 @@
 // UVol ENCODER
-// Written by Shaw for XR3ngine
 // MIT licensed
 
 // This encoder uses Corto for quantized mesh compression
