@@ -26,7 +26,6 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18.x
-          registry-url: https://npm.pkg.github.com/
           scope: '@etherealengine'
       - name: Config npm registry token
         run: npm config set '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
@@ -60,7 +59,7 @@ jobs:
           pr_title: ${{ github.event.release.tag_name }}
           pr_body: Bump version to ${{ github.event.release.tag_name }}
       - name: Publish to npm
-        run: npm run publish-no-verify
+        run: npm run publish-npm
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Config npm registry token
