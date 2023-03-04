@@ -1,9 +1,9 @@
 {
-  "name": "@xrfoundation/volumetric",
+  "name": "@etherealengine/volumetric",
   "version": "1.0.11",
   "repository": {
     "type": "git",
-    "url": "git://github.com/XRFoundation/Universal-Volumetric.git"
+    "url": "git://github.com/etherealengine/Universal-Volumetric.git"
   },
   "exports": {
     "./player": {
@@ -14,6 +14,9 @@
     },
     ".": {}
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist",
     "player.d.ts",
@@ -22,7 +25,7 @@
   "npmClient": "yarn",
   "jest": "ts-jest",
   "scripts": {
-    "patch-npm": "npm version patch && npm publish --access public",
+    "patch-npm": "npm version patch && npm publish",
     "build": "npm run build-player && npm run build-worker",
     "build-player": "tsc",
     "build-worker": "vite build --config vite.worker.config.ts",
@@ -39,12 +42,12 @@
       "prettier --write"
     ]
   },
-  "author": "XRFoundation",
+  "author": "EtherealEngine",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/XRFoundation/Universal-Volumetric/issues"
+    "url": "https://github.com/etherealengine/Universal-Volumetric/issues"
   },
-  "homepage": "https://github.com/XRFoundation/Universal-Volumetric#readme",
+  "homepage": "https://github.com/etherealengine/Universal-Volumetric#readme",
   "devDependencies": {
     "@babel/cli": "7.21.0",
     "@babel/core": "7.21.0",
