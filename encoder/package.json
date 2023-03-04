@@ -1,10 +1,10 @@
 {
-  "name": "@etherealengine/Universal-Volumetric",
+  "name": "volumetric",
   "version": "0.2.0",
   "private": true,
   "repository": {
     "type": "git",
-    "url": "git://github.com/etherealengine/Universal-Volumetric.git"
+    "url": "git://github.com/AtlasFoundation/Volumetric.git"
   },
   "engines": {
     "yarn": ">= 0.18.0"
@@ -14,13 +14,8 @@
   "scripts": {
     "encode": "babel ./src/libs/cortodecoder.js --out-file corto.js --plugins @@babel/plugin-transform-modules-umd"
   },
-  "author": "Ethereal Engine",
   "license": "MIT",
   "type": "module",
-  "bugs": {
-    "url": "https://github.com/etherealengine/three-volumetric/issues"
-  },
-  "homepage": "https://github.com/etherealengine/Universal-Volumetri#readme",
   "devDependencies": {
     "@babel/cli": "7.20.7",
     "@babel/core": "7.20.12",
