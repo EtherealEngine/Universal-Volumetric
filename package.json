@@ -41,8 +41,8 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@babel/cli": "7.20.7",
-    "@babel/core": "7.20.12",
+    "@babel/cli": "7.21.0",
+    "@babel/core": "7.21.0",
     "@types/three": "0.149.0",
     "@ianvs/prettier-plugin-sort-imports": "3.7.1",
     "prettier": "2.8.4",
