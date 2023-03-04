@@ -1,9 +1,9 @@
 {
-  "name": "@etherealengine/volumetric",
-  "version": "1.0.13",
+  "name": "volumetric",
+  "version": "1.0.11",
   "repository": {
     "type": "git",
-    "url": "git://github.com/etherealengine/Universal-Volumetric.git"
+    "url": "git://github.com/AtlasFoundation/Volumetric.git"
   },
   "exports": {
     "./player": {
@@ -14,9 +14,6 @@
     },
     ".": {}
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "files": [
     "dist",
     "player.d.ts",
@@ -25,16 +22,14 @@
   "npmClient": "yarn",
   "jest": "ts-jest",
   "scripts": {
-    "patch-npm": "npm version patch && npm publish",
+    "patch-npm": "npm version patch && npm publish --access public",
     "build": "npm run build-player && npm run build-worker",
     "build-player": "tsc",
     "build-worker": "vite build --config vite.worker.config.ts",
     "encode": "babel ./encoder/Encoder.js --out-file corto.js --plugins @babel/plugin-transform-modules-umd",
     "format": "prettier --write \"web/*.{ts,tsx}\"",
     "format-staged": "lint-staged",
-    "lint": "prettier --check \"web/*.{ts,tsx}\"",
-    "publish-no-verify": "npm publish --yes --ignore-scripts",
-    "publish-github": "npm publish --yes --ignore-scripts --registry https://npm.pkg.github.com"
+    "lint": "prettier --check \"web/*.{ts,tsx}\""
   },
   "pre-commit": [
     "format-staged"
@@ -44,12 +39,7 @@
       "prettier --write"
     ]
   },
-  "author": "EtherealEngine",
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/etherealengine/Universal-Volumetric/issues"
-  },
-  "homepage": "https://github.com/etherealengine/Universal-Volumetric#readme",
   "devDependencies": {
     "@babel/cli": "7.20.7",
     "@babel/core": "7.20.12",
