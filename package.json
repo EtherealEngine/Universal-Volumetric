@@ -19,6 +19,9 @@
     "player.d.ts",
     "worker.d.ts"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "npmClient": "yarn",
   "jest": "ts-jest",
   "scripts": {
