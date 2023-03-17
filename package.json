@@ -1,9 +1,9 @@
 {
-  "name": "@xrfoundation/volumetric",
-  "version": "1.0.11",
+  "name": "@etherealengine/volumetric",
+  "version": "1.1.1",
   "repository": {
     "type": "git",
-    "url": "git://github.com/XRFoundation/Universal-Volumetric.git"
+    "url": "git://github.com/etherealengine/Universal-Volumetric.git"
   },
   "exports": {
     "./player": {
@@ -19,6 +19,9 @@
     "player.d.ts",
     "worker.d.ts"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "npmClient": "yarn",
   "jest": "ts-jest",
   "scripts": {
@@ -29,7 +32,9 @@
     "encode": "babel ./encoder/Encoder.js --out-file corto.js --plugins @babel/plugin-transform-modules-umd",
     "format": "prettier --write \"web/*.{ts,tsx}\"",
     "format-staged": "lint-staged",
-    "lint": "prettier --check \"web/*.{ts,tsx}\""
+    "lint": "prettier --check \"web/*.{ts,tsx}\"",
+    "publish-npm": "npm publish --yes --ignore-scripts --registry=https://registry.npmjs.org",
+    "publish-github": "npm publish --yes --ignore-scripts --registry=https://npm.pkg.github.com"
   },
   "pre-commit": [
     "format-staged"
@@ -39,19 +44,14 @@
       "prettier --write"
     ]
   },
-  "author": "XRFoundation",
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/XRFoundation/Universal-Volumetric/issues"
-  },
-  "homepage": "https://github.com/XRFoundation/Universal-Volumetric#readme",
   "devDependencies": {
-    "@babel/cli": "7.19.3",
-    "@babel/core": "7.19.6",
-    "@types/three": "0.148.0",
+    "@babel/cli": "7.21.0",
+    "@babel/core": "7.21.0",
+    "@types/three": "0.149.0",
     "@ianvs/prettier-plugin-sort-imports": "3.7.1",
-    "prettier": "2.8.0",
-    "typescript": "4.9.4"
+    "prettier": "2.8.4",
+    "typescript": "4.9.5"
   },
   "dependencies": {
     "shelljs": "0.8.5",

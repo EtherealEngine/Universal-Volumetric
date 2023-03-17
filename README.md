@@ -1,6 +1,12 @@
 # Universal Volumetric
 
-The open source Universal Volumetric (".uvol") compressed interchange format for streaming mesh sequences. This project  includes a cross-platform player implementation using h.264 video for texture encoding and Draco and Corto compression for GLTF 3D model.
+### The open source Universal Volumetric (".uvol") compressed interchange format for streaming mesh sequences. 
+
+#### This tech was built in partnership with Wild Capture and others. 
+
+You can see an example on Wild Capture's site, here: http://wildcapture.co/volumetric.html
+
+This project  includes a cross-platform player implementation using h.264 video for texture encoding and Draco and Corto compression for GLTF 3D model.
 
 The initial version focuses on performance. Currently, single material mesh sequences of any length are supported. The next version will focus on higher compression ratio, streamability and integration into USD and glTF.
 
@@ -10,9 +16,6 @@ The current implementation uses the MIT-licensed Corto codec from CNR-ISTI Visua
 If you are proficient in C++, python, JS, Unity/C#, or you want to support this project creatively or financially, please get in touch!
 
 ### Example
-This tech was built in partnership with Wild Capture and others. 
-
-You can see an example on Wild Capture's site, here: http://wildcapture.co/volumetric.html
 
 Current uvol files consist of a .uvol binary, manifest file and video texture. Future versions will embed everything into the uvol binary or in a single MP4 container.
 

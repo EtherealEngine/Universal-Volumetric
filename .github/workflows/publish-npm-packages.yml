@@ -1,0 +1,76 @@
+name: publish-npm
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  secrets-gate:
+    runs-on: ubuntu-latest
+    outputs:
+      ok: ${{ steps.check-secrets.outputs.ok }}
+    steps:
+      - name: check for secrets needed to run workflows
+        id: check-secrets
+        run: |
+          if [ ${{ secrets.PUBLISH_NPM_PACKAGES_ENABLED }} == 'true' ]; then
+            echo "ok=enabled" >> $GITHUB_OUTPUT
+          fi
+  publish-npm:
+    needs:
+      - secrets-gate
+    if: ${{ needs.secrets-gate.outputs.ok == 'enabled' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          scope: '@etherealengine'
+      - name: Config npm registry token
+        run: npm config set '//registry.npmjs.org/:_authToken' "${NPM_TOKEN}"
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Set git username
+        run: git config user.name "CI Bot"
+      - name: Set git email
+        run: git config user.email ci-bot@etherealengine.org
+      - name: Set pr_branch_name environment variable
+        run: echo pr_branch_name=version-increment-${{ github.event.release.tag_name }} >> $GITHUB_ENV
+      - name: Switch to branch ${{ env.pr_branch_name }}
+        run: git switch -c ${{ env.pr_branch_name }}
+      - name: NPM increment version
+        run: npm version ${{ github.event.release.tag_name }} --no-git-tag-version
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Run git add
+        run: git add .
+      - name: Commit changes
+        run: git commit -m ${{ github.event.release.tag_name }}
+      - name: Push changes to new branch
+        run: git push --no-verify origin ${{ env.pr_branch_name }}
+      - name: Create version bump PR
+        uses: repo-sync/pull-request@v2
+        with:
+          destination_branch: ${{ github.event.release.target_commitish }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          source_branch: ${{ env.pr_branch_name }}
+          pr_title: ${{ github.event.release.tag_name }}
+          pr_body: Bump version to ${{ github.event.release.tag_name }}
+      - name: Install node modules
+        run: npm i
+      - name: Build dist
+        run: npm run build
+      - name: Publish to npm
+        run: npm run publish-npm
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Config npm registry token
+        run: npm config set '//npm.pkg.github.com/:_authToken' "${NPM_TOKEN}"
+        env:
+          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish to GitHub Packages
+        run: npm run publish-github
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
