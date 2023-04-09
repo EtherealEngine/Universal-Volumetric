@@ -1,0 +1,39 @@
+{
+  "name": "universal-volumetric",
+  "version": "0.0.1",
+  "private": false,
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/EtherealEngine/Universal-Volumetric.git"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build-player": "tsc",
+    "build-worker": "vite build --config vite.worker.config.ts",
+    "build": "npm run build-player && npm run build-worker"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/EtherealEngine/Universal-Volumetric/issues"
+  },
+  "files": [
+    "dist",
+    "index.ts"
+  ],
+  "homepage": "https://github.com/EtherealEngine/Universal-Volumetric#readme",
+  "dependencies": {
+    "@types/three": "^0.150.1",
+    "draco3d": "^1.5.6",
+    "glob": "7.2.0",
+    "three": "^0.151.3",
+    "xmlhttprequest": "^1.8.0"
+  },
+  "devDependencies": {
+    "@types/draco3d": "^1.4.2",
+    "ts-loader": "^9.4.2",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.3",
+    "vite": "^4.2.1"
+  }
+}

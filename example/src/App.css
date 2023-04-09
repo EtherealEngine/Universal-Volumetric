@@ -1,0 +1,81 @@
+.App {
+  text-align: center;
+}
+
+body {
+  --text-color: #222;
+  --bkg-color: #fff;
+  --shadow-color: rgba(0, 0, 0, 0.47);
+}
+
+@media (prefers-color-scheme: dark) {
+  /* defaults to dark theme */
+  body {
+    --text-color: #eee;
+    --bkg-color: #121212;
+    --shadow-color: rgba(255, 255, 255, 0.47);
+  }
+}
+
+body {
+  background: var(--bkg-color);
+  color: var(--text-color);
+  background-color: red;
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+button {
+  font-size: calc(10px + 2vmin);
+}
+
+button.player-toggle, button.player-play {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 9999;
+}
+
+button.player-play {
+  right: 200px;
+}
+
+.buffering-indication {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  padding: 10px 40px;
+  box-sizing: border-box;
+  box-shadow: 0 0 24px var(--shadow-color);
+  border-radius: 8px;
+  font-size: 19px;
+  font-weight: 500;
+  background: var(--bkg-color);
+}
+
+.actorCanvas, .counterCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: 300px;
+  max-height: 300px;
+}
+
+.counterCanvas {
+  top: 10px;
+  left: 11px;
+  border: red solid 1px;
+  zoom: 20;
+  z-index: 9999;
+}
