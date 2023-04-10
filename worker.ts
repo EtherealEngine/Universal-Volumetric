@@ -59,6 +59,7 @@ function startHandlerLoop({ meshFilePath, fileHeader }) {
       const requestEndBytePosition = endFrameData.startBytePosition + endFrameData.meshLength
 
       const outgoingMessages = []
+      const transferables = [];
 
       const response = await fetch(_meshFilePath, {
         headers: {
@@ -69,9 +70,9 @@ function startHandlerLoop({ meshFilePath, fileHeader }) {
       })
 
       const oldBuffer = await (response as Response).arrayBuffer();
-      const newBuffer = new Uint8Array(oldBuffer); /* need to create new buffer, due to detached ArrayBuffer error */
+      let newBuffer = new Uint8Array(oldBuffer); /* need to create new buffer, due to detached ArrayBuffer error */
+      
 
-        const transferables = []
         for (let i = frameStart; i < frameEnd; i++) {
           const currentFrameData = _fileHeader.frameData[i]
 
@@ -89,13 +90,25 @@ function startHandlerLoop({ meshFilePath, fileHeader }) {
           // transferables.push(bufferGeometry.uv)
 
           // Add to the messageQueue
+
+          const geometryAttrs = {
+            index: bufferGeometry.index.array,
+            position: bufferGeometry.getAttribute('position').array,
+            uv: bufferGeometry.getAttribute('uv').array
+          }
+
           outgoingMessages.push({
             frameNumber: currentFrameData.frameNumber,
             keyframeNumber: currentFrameData.keyframeNumber,
-            bufferGeometry
+            geometryAttrs
           })
+
+          transferables.push(geometryAttrs.index.buffer);
+          transferables.push(geometryAttrs.position.buffer);
+          transferables.push(geometryAttrs.uv.buffer);
         }
-        ; (globalThis as any).postMessage({ type: 'framedata', payload: outgoingMessages })
+        newBuffer = null;
+        ; (globalThis as any).postMessage({ type: 'framedata', payload: outgoingMessages }, transferables);
       } catch (error) {
         ; (globalThis as any).postMessage({ type: 'framedata', payload: [] })
         console.error('WORKERERROR: ', error, frameStart, frameEnd)

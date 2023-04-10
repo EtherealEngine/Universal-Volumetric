@@ -38,7 +38,7 @@ import {
   }
   
   export default class Player {
-    static defaultWorkerURL = new URL('./worker.build.js', import.meta.url).href;
+    static defaultWorkerURL = new URL('./worker.build.es.js', import.meta.url).href;
   
     // Public Fields
     public renderer: WebGLRenderer
@@ -346,12 +346,17 @@ import {
     handleFrameData(messages) {
       // console.log(`received frames ${messages[0].keyframeNumber} - ${messages[messages.length-1].keyframeNumber}`)
       for (const frameData of messages) {
-        // let geometry = new BufferGeometry()
+        // console.log(frameData);
+        let geometry = new BufferGeometry()
         // geometry.setIndex(new Uint16BufferAttribute(frameData.bufferGeometry.index.buffer, 1))
         // geometry.setAttribute('position', new Float32BufferAttribute(frameData.bufferGeometry.position.buffer, 3))
         // geometry.setAttribute('uv', new Float32BufferAttribute(frameData.bufferGeometry.uv.buffer, 2))
-        console.log(frameData.bufferGeometry);
-        this.meshBuffer.set(frameData.keyframeNumber, frameData.bufferGeometry);
+        geometry.setIndex(new Uint16BufferAttribute(frameData.geometryAttrs.index, 1))
+        geometry.setAttribute('position', new Float32BufferAttribute(frameData.geometryAttrs.position, 3))
+        geometry.setAttribute('uv', new Float32BufferAttribute(frameData.geometryAttrs.uv, 2))
+
+        // console.log(geometry);
+        this.meshBuffer.set(frameData.keyframeNumber, geometry);
       }
   
       if (typeof this.onMeshBuffering === 'function') {
