@@ -190,7 +190,7 @@ class CortosisFileCreator {
     // // Convert our file info into buffer and save to file stream
     const fileDataBuffer = Buffer.from(JSON.stringify(fileData), 'utf-8');
 
-    const manifestStream = fs.createWriteStream(fileName.replace('drcs', 'manifest'));
+    const manifestStream = fs.createWriteStream(fileName.replace('uvol', 'manifest'));
     manifestStream.write(fileDataBuffer, err => {
       if (err) console.log("ERROR", err);
     });

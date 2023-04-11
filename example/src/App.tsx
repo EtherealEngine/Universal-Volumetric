@@ -8,11 +8,7 @@ console.log('import.meta.url', import.meta.url)
 function App() {
   const [playerVisible, setPlayerVisible] = useState(false)
   const paths = [
-    // "/sam_low_fuse.drcs",
-    // "/liamlow.drcs",
-    // "/ohno_jugo_low.drcs"
-    "/yoga.drcs"
-    // "/yoga.drcs"
+    "/yoga.uvol"
   ]
   return (
     <div className="App">

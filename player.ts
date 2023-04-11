@@ -50,7 +50,7 @@ import {
     public playMode: PlayMode
     public waitForVideoLoad = 3 //3 seconds
     public autoPreview = true
-    public targetFramesToRequest = 90
+    public targetFramesToRequest = 20 // larger value causes buffering with smaller UVOL files.
   
     public useVideoRequestCallback: boolean
   
@@ -346,16 +346,10 @@ import {
     handleFrameData(messages) {
       // console.log(`received frames ${messages[0].keyframeNumber} - ${messages[messages.length-1].keyframeNumber}`)
       for (const frameData of messages) {
-        // console.log(frameData);
         let geometry = new BufferGeometry()
-        // geometry.setIndex(new Uint16BufferAttribute(frameData.bufferGeometry.index.buffer, 1))
-        // geometry.setAttribute('position', new Float32BufferAttribute(frameData.bufferGeometry.position.buffer, 3))
-        // geometry.setAttribute('uv', new Float32BufferAttribute(frameData.bufferGeometry.uv.buffer, 2))
         geometry.setIndex(new Uint16BufferAttribute(frameData.geometryAttrs.index, 1))
         geometry.setAttribute('position', new Float32BufferAttribute(frameData.geometryAttrs.position, 3))
         geometry.setAttribute('uv', new Float32BufferAttribute(frameData.geometryAttrs.uv, 2))
-
-        // console.log(geometry);
         this.meshBuffer.set(frameData.keyframeNumber, geometry);
       }
   
@@ -369,7 +363,7 @@ import {
     setTrackPath(track) {
       const path = this.paths[track % this.paths.length]
       if (!path) return
-      this.video.src = path.replace('.drcs', '.mp4').replace('.uvol', '.mp4')
+      this.video.src = path.replace('.uvol', '.mp4')
       this.video.load()
     }
   
@@ -406,7 +400,7 @@ import {
   
     resetWorker() {
       const manifestFilePath = (this.manifestFilePath = this.video.src.replace('.mp4', '.manifest'))
-      const meshFilePath = (this.meshFilePath = this.video.src.replace('.mp4', '.drcs'))
+      const meshFilePath = (this.meshFilePath = this.video.src.replace('.mp4', '.uvol'))
       this.isWorkerReady = false
       const xhr = new XMLHttpRequest()
       xhr.onreadystatechange = () => {
