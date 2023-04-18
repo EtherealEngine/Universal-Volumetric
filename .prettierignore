@@ -1,0 +1,3 @@
+dist
+/corto.ts # this is taken directly from corto library, don't change this
+/DRACOLoader.js # this is taken directly from draco library, don't change this

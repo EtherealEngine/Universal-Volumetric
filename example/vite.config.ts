@@ -1,13 +1,13 @@
-import { defineConfig } from 'vite'
-import reactRefresh from '@vitejs/plugin-react-refresh'
+import { defineConfig } from 'vite';
+import reactRefresh from '@vitejs/plugin-react-refresh';
 
 // https://vitejs.dev/config/
 export default defineConfig({
   // plugins: [reactRefresh()],
   optimizeDeps: {
-    exclude: ['@etherealengine/volumetric']
+    exclude: ['@etherealengine/volumetric'],
   },
   server: {
-    fs: { allow: ['..'] }
-  }
-})
+    fs: { allow: ['..'] },
+  },
+});

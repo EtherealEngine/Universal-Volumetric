@@ -1,6 +1,6 @@
 {
   "name": "universal-volumetric",
-  "version": "0.0.1",
+  "version": "2.0.0",
   "private": false,
   "type": "module",
   "repository": {
@@ -24,6 +24,7 @@
   "homepage": "https://github.com/EtherealEngine/Universal-Volumetric#readme",
   "dependencies": {
     "@types/three": "^0.150.1",
+    "commander": "^10.0.0",
     "draco3d": "^1.5.6",
     "glob": "7.2.0",
     "three": "^0.151.3",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "@types/draco3d": "^1.4.2",
+    "prettier": "^2.8.7",
     "ts-loader": "^9.4.2",
     "ts-node": "^10.9.1",
     "typescript": "^5.0.3",

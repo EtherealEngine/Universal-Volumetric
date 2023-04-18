@@ -38,7 +38,8 @@ button {
   font-size: calc(10px + 2vmin);
 }
 
-button.player-toggle, button.player-play {
+button.player-toggle,
+button.player-play {
   position: absolute;
   top: 0;
   right: 0;
@@ -64,7 +65,8 @@ button.player-play {
   background: var(--bkg-color);
 }
 
-.actorCanvas, .counterCanvas {
+.actorCanvas,
+.counterCanvas {
   position: absolute;
   top: 0;
   left: 0;

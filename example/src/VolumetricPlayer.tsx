@@ -1,14 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import DracosisPlayer from "universal-volumetric/dist/player";
+import DracosisPlayer from 'universal-volumetric/dist/player';
 
 import {
   PerspectiveCamera,
   Scene,
   Vector3,
   WebGLRenderer,
-  sRGBEncoding, Object3D, Group
-} from "three";
-import { OrbitControls } from "three-stdlib";
+  sRGBEncoding,
+  Object3D,
+  Group,
+} from 'three';
+import { OrbitControls } from 'three-stdlib';
 
 const cameraOrbitingHeight = 1.7;
 const cameraDistance = 6.5;
@@ -16,29 +18,29 @@ const cameraVerticalOffset = 0.4;
 const cameraFov = 35;
 
 type VolumetricPlayerProps = {
-  paths: Array<string>
-  style: any
-}
+  paths: Array<string>;
+  style: any;
+};
 
-const VolumetricPlayer = (props:VolumetricPlayerProps) => {
-
+const VolumetricPlayer = (props: VolumetricPlayerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const rendererRef = useRef<WebGLRenderer|null>(null);
-  const playerRef = useRef<DracosisPlayer|null>(null);
-  const anchorRef = useRef<Object3D|null>(null);
-  const sceneRef = useRef<Object3D|null>(null);
-  const cameraRef = useRef<PerspectiveCamera|null>(null);
-  const controlsRef = useRef<OrbitControls|null>(null);
-  let animationFrameId:number;
-  const [dracosisSequence, setDracosisSequence] = useState<DracosisPlayer|null>(null);
+  const rendererRef = useRef<WebGLRenderer | null>(null);
+  const playerRef = useRef<DracosisPlayer | null>(null);
+  const anchorRef = useRef<Object3D | null>(null);
+  const sceneRef = useRef<Object3D | null>(null);
+  const cameraRef = useRef<PerspectiveCamera | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
+  let animationFrameId: number;
+  const [dracosisSequence, setDracosisSequence] =
+    useState<DracosisPlayer | null>(null);
   const [playIsStarted, setPlayIsStarted] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const [bufferingProgress, setBufferingProgress] = useState(0);
   const [bufferingTimestamp, setBufferingTimestamp] = useState(Date.now());
   const [, setForceRerender] = useState(0);
   const videoReady = !!dracosisSequence;
-  
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) {
@@ -76,7 +78,7 @@ const VolumetricPlayer = (props:VolumetricPlayerProps) => {
     const renderConfig = {
       canvas: canvasRef.current,
       antialias: true,
-      alpha: true
+      alpha: true,
     };
     if (!rendererRef.current) {
       rendererRef.current = new WebGLRenderer(renderConfig);
@@ -156,7 +158,11 @@ const VolumetricPlayer = (props:VolumetricPlayerProps) => {
         renderer,
         paths: props.paths,
         onMeshBuffering: (progress) => {
-          console.warn('BUFFERING!!', progress, playerRef.current?.currentFrame);
+          console.warn(
+            'BUFFERING!!',
+            progress,
+            playerRef.current?.currentFrame
+          );
           setBufferingProgress(Math.round(progress * 100));
           setIsBuffering(true);
           setBufferingTimestamp(Date.now());
@@ -164,14 +170,14 @@ const VolumetricPlayer = (props:VolumetricPlayerProps) => {
         },
         onFrameShow: () => {
           setIsBuffering(false);
-        }
+        },
       });
       scene.add(playerRef.current.mesh as any);
     }
 
     //test purpose
     //@ts-ignore
-    window.UVOLPlayer = playerRef.current
+    window.UVOLPlayer = playerRef.current;
 
     setDracosisSequence(playerRef.current);
 
@@ -183,7 +189,7 @@ const VolumetricPlayer = (props:VolumetricPlayerProps) => {
       console.log('+++ CLEANUP player');
 
       cancelAnimationFrame(animationFrameId);
-      window.removeEventListener("resize", onResize);
+      window.removeEventListener('resize', onResize);
       // clear volumetric player
       playerRef.current?.dispose();
 
@@ -210,16 +216,26 @@ const VolumetricPlayer = (props:VolumetricPlayerProps) => {
 
   const timeSincebufferingStarted = Date.now() - bufferingTimestamp;
 
-  const playButton = playIsStarted ? null : <button onTouchEnd={() => startPlayer()} onClick={() => startPlayer()} className={"button player-play"}>{videoReady ? "Play" : "Loading..."}</button>;
-  const bufferingIndication = playIsStarted && isBuffering && timeSincebufferingStarted > 80 ? <div className={"buffering-indication"}>Buffering...</div> : null;
-  return <div className="volumetric__player" style={props.style} ref={containerRef}>
-    {playButton}
-    {bufferingIndication}
-    <canvas
-      ref={canvasRef}
-      className={"mainCanvas"}
-    />
-  </div>;
+  const playButton = playIsStarted ? null : (
+    <button
+      onTouchEnd={() => startPlayer()}
+      onClick={() => startPlayer()}
+      className={'button player-play'}
+    >
+      {videoReady ? 'Play' : 'Loading...'}
+    </button>
+  );
+  const bufferingIndication =
+    playIsStarted && isBuffering && timeSincebufferingStarted > 80 ? (
+      <div className={'buffering-indication'}>Buffering...</div>
+    ) : null;
+  return (
+    <div className="volumetric__player" style={props.style} ref={containerRef}>
+      {playButton}
+      {bufferingIndication}
+      <canvas ref={canvasRef} className={'mainCanvas'} />
+    </div>
+  );
 };
 
 export default VolumetricPlayer;
