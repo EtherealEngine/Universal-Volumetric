@@ -20,18 +20,17 @@ Usage: universal-volumetric [options] <output-file-name>
 CLI to encoder geometry files into UVOL format
 
 Arguments:
-  output-file-name                    Output filename
+  output-file-name                   Output filename
 
 Options:
-  -V, --version                       output the version number
-  -gc, --geometry-compression <type>  Compression type of 3D geometries
-  -tc, --texture-compression <type>   Compression type of 3D textures. Default value: mp4
-  -f, --framerate <value>             Frame rate of the output volumetric video. Default value: 30 fps
+  -V, --version                      output the version number
+  -tc, --texture-compression <type>  Compression type of 3D textures. Default value: mp4
+  -f, --frame-rate <value>           Frame rate of the output volumetric video. Default value: 30 fps
   -v, --verbose
-  -i, --input-path <path>             Directory that contains 3d models (drc or crt files)
-  --start-frame <value>               Default value: 0
-  --end-frame <value>                 Default value: Total number of frames - 1
-  -h, --help                          display help for command
+  -i, --input-path <path>            Directory that contains 3d models (drc or crt files)
+  --geometry-start-frame <value>     Default value: 0
+  --texture-start-frame <value>      Default value: 0
+  -h, --help                         display help for command
 ```
 
 #### Sample command
@@ -47,3 +46,23 @@ cd example/
 npm install
 npm run dev
 ```
+
+### V2 Manifest file structure
+
+```typescript
+{
+  version: string,
+  geometry: {
+    frameRate: number
+    startFrame: number
+    frameData: number[]
+    compression: string
+  },
+  texture: {
+    frameRate: number
+    compression: string
+  }
+}
+```
+
+`frameData` and `startFrame` will be added to the texture to support ktx2 texture.

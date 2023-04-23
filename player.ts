@@ -11,8 +11,6 @@ import {
   WebGLRenderer,
 } from 'three';
 
-import { IFileHeader } from './Interfaces';
-
 export enum PlayMode {
   single = 'single',
   random = 'random',
@@ -72,7 +70,7 @@ export default class Player {
   private _worker: Worker;
   private onMeshBuffering: onMeshBufferingCallback | null = null;
   private onFrameShow: onFrameShowCallback | null = null;
-  fileHeader: IFileHeader;
+  fileHeader;
   tempBufferObject: BufferGeometry;
 
   private currentTrack: number = 0;
@@ -91,12 +89,20 @@ export default class Player {
   currentVideoFrame: number = 0;
   nextFrameToRequest: number = 0;
 
+  get isV2() {
+    if (!this.fileHeader.version || this.fileHeader.version !== '2.0.0') return false;
+    return true;
+  }
+
   get video() {
     return this._video;
   }
 
   get numberOfFrames() {
-    return this.fileHeader?.frameData.length || 0;
+    if (this.isV2) {
+      return this.fileHeader.geometry.frameData.length;
+    } else 
+      return this.fileHeader?.frameData.length || 0;
   }
 
   constructor({
@@ -170,8 +176,14 @@ export default class Player {
     const handleVideoFrame = (now, metadata) => {
       this._video.requestVideoFrameCallback(handleVideoFrame);
       if (!this.useVideoRequestCallback || !this.fileHeader) return;
+      let frameRate = null;
+      if (this.isV2) {
+        frameRate = this.fileHeader.texture.frameRate;
+      } else {
+        frameRate = this.fileHeader.frameRate;
+      }
       const frameToPlay = Math.round(
-        metadata.mediaTime * this.fileHeader.frameRate
+        metadata.mediaTime * frameRate
       );
       this.processFrame(frameToPlay);
     };

@@ -9,15 +9,11 @@ program
 
 program
   .option(
-    '-gc, --geometry-compression <type>',
-    'Compression type of 3D geometries'
-  )
-  .option(
     '-tc, --texture-compression <type>',
     'Compression type of 3D textures. Default value: mp4'
   )
   .option(
-    '-f, --framerate <value>',
+    '-f, --frame-rate <value>',
     'Frame rate of the output volumetric video. Default value: 30 fps'
   )
   .option('-v, --verbose')
@@ -26,29 +22,10 @@ program
     'Directory that contains 3d models (drc or crt files)'
   )
   .argument('<output-file-name>', 'Output filename')
-  .option('--start-frame <value>', 'Default value: 0')
-  .option('--end-frame <value>', 'Default value: Total number of frames - 1');
+  .option('--geometry-start-frame <value>', 'Default value: 0')
+  .option('--texture-start-frame <value>', 'Default value: 0');
 
 function performArgChecks(options, args) {
-  if (!options.geometryCompression || !options.inputPath || !args) {
-    console.error('Please pass the required arguments');
-    process.exit(1);
-  }
-  if (
-    options.geometryCompression != 'draco' &&
-    options.geometryCompression != 'corto'
-  ) {
-    console.error("Geomtetry Compression can be either 'draco' or 'corto'");
-    process.exit(1);
-  }
-
-  if (!options.textureCompression) {
-    options.textureCompression = 'mp4';
-  } else if (options.textureCompression != 'mp4') {
-    console.error('Currently only mp4 texture is supported');
-    process.exit(1);
-  }
-
   if (
     !(
       fs.existsSync(options.inputPath) &&
@@ -61,70 +38,82 @@ function performArgChecks(options, args) {
     options.inputPath += '/';
   }
 
-  if (!options.startFrame) {
-    options.startFrame = 0;
+  if (!options.geometryStartFrame) {
+    options.geometryStartFrame = 0;
   } else {
-    options.startFrame = parseInt(options.startFrame);
+    options.geometryStartFrame = parseInt(options.geometryStartFrame);
   }
-  if (options.endFrame) {
-    options.endFrame = parseInt(options.endFrame);
+  if (!options.textureStartFrame) {
+    options.textureStartFrame = 0;
+  } else {
+    options.textureStartFrame = parseInt(options.textureStartFrame);
   }
+
+  options.frameRate = parseInt(options.frameRate);
+}
+
+function generateStartBytes(fileList, outputFile) {
+  let outputBuffer = Buffer.alloc(0);
+  let currentWritePosition = 0;
+  const frameData = [];
+  fileList.forEach(function (fileName, index) {
+    const rawData = fs.readFileSync(fileName);
+    const rawBuffer = Buffer.from(rawData);
+    frameData.push(currentWritePosition);
+    outputBuffer = Buffer.concat([outputBuffer, rawBuffer]);
+    currentWritePosition += rawBuffer.byteLength;
+  });
+  const outputStream = fs.createWriteStream(outputFile);
+  outputStream.write(outputBuffer, (err) => {
+    if (err) {
+      console.error(`Error in writing to output file [${outputFile}]: `, err);
+    }
+  });
+  outputStream.end();
+  return frameData;
 }
 
 function constructUVOL(
-  geometryCompression,
   textureCompression,
   frameRate,
   inputPath,
-  startFrame,
-  endFrame,
+  geometryStartFrame,
+  textureStartFrame,
   outputFile,
   verbose
 ) {
-  let meshFiles = [];
-  const filePattern = geometryCompression == 'draco' ? '*.drc' : '*.crt';
-
-  meshFiles = glob.sync(inputPath + filePattern);
-  if (verbose) {
-    console.log(`Number of ${geometryCompression} files: `, meshFiles.length);
-  }
-
-  startFrame = parseInt(startFrame);
-  if (!endFrame) {
-    endFrame = startFrame + meshFiles.length - 1;
-  } else if (endFrame - startFrame + 1 != meshFiles.length) {
-    console.error(
-      'Incompatible start-frame, end-frame arguments with the number of mesh files in input-path'
-    );
-    process.exit(1);
-  }
-
-  let writeBuffer = Buffer.alloc(0);
-  let currentPositionInWriteStream = 0;
-
   const manifestData = {
     version: '2.0.0',
-    frameRate: frameRate,
-    geometryCompression: geometryCompression,
-    textureCompression: textureCompression,
-    frameData: [],
+    geometry: {
+      frameRate: frameRate,
+      startFrame: geometryStartFrame,
+      frameData: [],
+      compression: 'draco',
+    },
+    texture: {
+      frameRate: frameRate,
+      // startFrame: textureStartFrame,
+      // frameData: [],
+      compression: textureCompression || 'mp4',
+    },
   };
-
-  for (let i = startFrame; i <= endFrame; i++) {
-    const rawData = fs.readFileSync(meshFiles[i - startFrame]);
-    const rawBuffer = Buffer.from(rawData);
-    writeBuffer = Buffer.concat([writeBuffer, rawBuffer]);
-    manifestData.frameData.push([i, currentPositionInWriteStream]);
-    currentPositionInWriteStream += rawBuffer.byteLength;
+  const meshFiles = glob.sync(inputPath + '*.drc');
+  if (verbose) {
+    console.log('Number of draco files: ', meshFiles.length);
   }
+  manifestData.geometry.frameData = generateStartBytes(meshFiles, outputFile);
 
-  const uvolStream = fs.createWriteStream(outputFile);
-  uvolStream.write(writeBuffer, (err) => {
-    if (err) {
-      console.error('Error in writing to UVOL file: ', err);
+  if (textureCompression === 'ktx2') {
+    manifestData['texture']['startFrame'] = textureStartFrame;
+    const textureFiles = glob.sync(inputPath + '*.ktx2');
+    if (verbose) {
+      console.log('Number of ktx2 files: ', textureFiles.length);
     }
-  });
-  uvolStream.end();
+    manifestData.texture.frameData = generateStartBytes(
+      textureFiles,
+      outputFile.replace('uvol', 'texture')
+    );
+  }
 
   const manifestStream = fs.createWriteStream(
     outputFile.replace('uvol', 'manifest')
@@ -146,12 +135,11 @@ const args = program.args;
 
 performArgChecks(options, args);
 constructUVOL(
-  options.geometryCompression,
   options.textureCompression,
-  options.framerate,
+  options.frameRate,
   options.inputPath,
-  options.startFrame,
-  options.endFrame,
+  options.geometryStartFrame,
+  options.textureStartFrame,
   args[0],
   options.verbose
 );
