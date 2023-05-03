@@ -1,0 +1,1 @@
+javah -jni -classpath app/src/main/java -d cpp/ com.example.corto.MainActivity

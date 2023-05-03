@@ -1,4 +1,5 @@
 **/node_modules/**
+**/deprecated/**
 web/Interfaces.ts
 web/corto.ts
 **/*.d.ts

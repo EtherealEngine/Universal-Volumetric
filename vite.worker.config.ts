@@ -1,15 +1,14 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vite';
 
 export default defineConfig({
   // ...
   build: {
-    
     lib: {
       fileName: 'worker.build',
       formats: ['es'],
-      entry: 'web/worker.ts'
+      entry: 'src/UVOLPlayerWorker.ts',
     },
 
-    emptyOutDir: false
-  }
-})
+    emptyOutDir: false,
+  },
+});

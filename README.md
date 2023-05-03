@@ -34,41 +34,45 @@ https://opencollective.com/etherealengine
 Or find us on Discord!
 https://discord.gg/xrf
 
-## Encoding
+## Dev Setup
 
-### Mesh
+Clone this repository and run the following commands to run the `example`.
 
-First, you need a .ply sequence. If you have a .obj sequence, you can convert to to ply using this command:
+Place draco geometry files in `assets` directory and run `Encoder.js` script.
+
+### See help for more details
+
 ```
-bash src/encoder/make_plys.sh
+❯ node Encoder.js --help
+Usage: universal-volumetric [options] <output-file-name>
+
+CLI to encoder geometry files into UVOL format
+
+Arguments:
+  output-file-name                    Output filename
+
+Options:
+  -V, --version                       output the version number
+  -gc, --geometry-compression <type>  Compression type of 3D geometries
+  -tc, --texture-compression <type>   Compression type of 3D textures. Default value: mp4
+  -f, --framerate <value>             Frame rate of the output volumetric video. Default value: 30 fps
+  -v, --verbose
+  -i, --input-path <path>             Directory that contains 3d models (drc or crt files)
+  --start-frame <value>               Default value: 0
+  --end-frame <value>                 Default value: Total number of frames - 1
+  -h, --help                          display help for command
 ```
 
-Next, put your ply files in the src/encoder/encode folder. If you want to change this path, you can do so by modifying Encoder.js (NOTE: this will be moved to an argument in the next version).
+#### Sample command
 
-Run the encoder on the meshes:
+```
+node Encoder.js -v -gc draco -i assets -f 30 liam.uvol
+```
+
 ```bash
-node ./src/Encoder.js example.uvol
+yarn install
+npm run build # builds files into "dist" directory
+cd example/
+npm install
+npm run dev
 ```
-
-If you want to set a specific framerange or frame rate, you can set that as well
-```bash
-// Extended Example: 25 FPS, 500 frames
-node ./src/Encoder.js example.uvol 25 0 499
-```
-
-### Texture
-
-Texture is stored as an H264 video.
-
-Due to inadequacies in iOS frame sync (as well as multithreaded framesync issues in Unity) we are baking the frame number directly into the texture. This frame sync is 8px high, 128px wide. After some experimentation, we found that this is resistant to aliasing and macroblocking in video. However, it might cause issues with your textures unless you pre-process your textures be offset by 8 px from the bottom of your image. The next version will autoscale your UVs to have 8px available at the bottom.
-
-### Encoding frame counter to texture
-```python
-python3 src/encoder/texture_encoder.py
-```
-
-### Encoding image sequence to MP4
-```bash
-ffmpeg -r 30 -s 1024x1024 -i src/encoder/encode/tex%05d.png -vcodec libx264 -crf 25 example.mp4
-```
-
