@@ -12,7 +12,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build-player": "tsc",
     "build-worker": "vite build --config vite.worker.config.ts",
-    "build": "npm run build-player && npm run build-worker"
+    "copy-files": "cp src/lib/draco_decoder.wasm dist/lib/draco_decoder.wasm",
+    "build": "npm run build-player && npm run build-worker && npm run copy-files"
   },
   "license": "MIT",
   "bugs": {
