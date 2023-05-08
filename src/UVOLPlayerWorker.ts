@@ -3,8 +3,6 @@ import * as THREE from 'three';
 import { DRACOLoader } from './lib/DRACOLoader.js';
 import { CortoDecoder } from './lib/corto.js';
 
-let _meshFilePath;
-let _fileHeader;
 let timer;
 
 function isV2(version) {
@@ -58,10 +56,9 @@ async function extractGeometryAttrs(
 
 function getRequestHeaders(fileHeader, frameStart: number, frameEnd: number) {
   if (isV2(fileHeader.version)) {
-    const startFrameData = fileHeader.frameData[frameStart];
-    const requestStartBytePosition = startFrameData[1];
+    const requestStartBytePosition = fileHeader.geometry.frameData[frameStart];
     const requestEndBytePosition =
-      frameEnd < fileHeader.length ? fileHeader.frameData[frameEnd][1] : '';
+      frameEnd < fileHeader.geometry.frameData.length ? fileHeader.geometry.frameData[frameEnd] : '';
     return {
       range: `bytes=${requestStartBytePosition}-${requestEndBytePosition}`,
     };
@@ -84,26 +81,28 @@ function getSlice(
   frameStart: number,
   currentFrame: number
 ) {
-  const startFrameData = fileHeader.frameData[frameStart];
-  const currentFrameData = fileHeader.frameData[currentFrame];
   if (isV2(fileHeader.version)) {
-    const fileReadStartPosition = currentFrameData[1] - startFrameData[1];
+    const startFrameData = fileHeader.geometry.frameData[frameStart];
+    const currentFrameData = fileHeader.geometry.frameData[currentFrame];
+    const fileReadStartPosition = currentFrameData - startFrameData;
 
-    if (currentFrame < fileHeader.frameData.length - 1) {
+    if (currentFrame < (fileHeader.geometry.frameData.length - 1)) {
       const fileReadEndPosition =
         fileReadStartPosition +
-        (fileHeader.frameData[currentFrame + 1][1] -
-          fileHeader.frameData[currentFrame][1]);
+        (fileHeader.geometry.frameData[currentFrame + 1] -
+          fileHeader.geometry.frameData[currentFrame]);
       const slice = buffer.buffer.slice(
         fileReadStartPosition,
         fileReadEndPosition
       );
       return slice;
-    } else if (currentFrame == fileHeader.frameData.length - 1) {
+    } else if (currentFrame == (fileHeader.geometry.frameData.length - 1)) {
       const slice = buffer.buffer.slice(fileReadStartPosition);
       return slice;
     }
   } else {
+    const startFrameData = fileHeader.frameData[frameStart];
+    const currentFrameData = fileHeader.frameData[currentFrame];
     const fileReadStartPosition =
       currentFrameData.startBytePosition - startFrameData.startBytePosition;
     const fileReadEndPosition =
@@ -122,13 +121,11 @@ type requestPayload = {
 };
 
 const loader = new DRACOLoader();
-loader.setDecoderPath('./lib');
+loader.setDecoderPath('./lib/');
 
 const messageQueue: requestPayload[] = [];
 
 function startHandlerLoop({ meshFilePath, fileHeader }) {
-  _meshFilePath = meshFilePath;
-  _fileHeader = fileHeader;
   (globalThis as any).postMessage({ type: 'initialized' });
 
   timer = setInterval(async () => {
@@ -137,12 +134,12 @@ function startHandlerLoop({ meshFilePath, fileHeader }) {
     let { frameStart, frameEnd } = messageQueue.shift();
 
     try {
-      const header = getRequestHeaders(_fileHeader, frameStart, frameEnd);
+      const header = getRequestHeaders(fileHeader, frameStart, frameEnd);
 
       const outgoingMessages = [];
       const transferables = [];
 
-      const response = await fetch(_meshFilePath, {
+      const response = await fetch(meshFilePath, {
         headers: header,
       }).catch((err) => {
         console.error('WORKERERROR: ', err);
@@ -154,13 +151,13 @@ function startHandlerLoop({ meshFilePath, fileHeader }) {
       ); /* need to create new buffer, due to detached ArrayBuffer error */
 
       for (let i = frameStart; i < frameEnd; i++) {
-        const slice = getSlice(newBuffer, _fileHeader, frameStart, i);
+        const slice = getSlice(newBuffer, fileHeader, frameStart, i);
         let keyframeNumber, geometryCompression;
-        if (_fileHeader.version && _fileHeader.version == '2.0.0') {
-          keyframeNumber = _fileHeader.frameData[i][0];
-          geometryCompression = _fileHeader.geometryCompression;
+        if (isV2(fileHeader.version)) {
+          keyframeNumber = fileHeader.geometry.startFrame + i;
+          geometryCompression = fileHeader.geometry.compression;
         } else {
-          keyframeNumber = _fileHeader.frameData[i].keyframeNumber;
+          keyframeNumber = fileHeader.frameData[i].keyframeNumber;
           geometryCompression = 'corto'; // old compression format
         }
         const geometryAttrs = await extractGeometryAttrs(
