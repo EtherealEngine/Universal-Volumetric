@@ -102,7 +102,7 @@ export default class Player {
   get numberOfFrames() {
     if (this.isV2) {
       return this.fileHeader.geometry.frameData.length;
-    } else 
+    } else
       return this.fileHeader?.frameData.length || 0;
   }
 
@@ -170,7 +170,6 @@ export default class Player {
       for (const buffer of this.meshBuffer.values()) buffer?.dispose();
       this.meshBuffer.clear();
       this.nextFrameToRequest = 0;
-      this.resetWorker();
       this.video.playbackRate = 0;
     });
 
@@ -204,7 +203,7 @@ export default class Player {
       this._videoTexture.minFilter = LinearFilter;
       this._videoTexture.magFilter = LinearFilter;
       (this._videoTexture as any).isVideoTexture = true;
-      (this._videoTexture as any).update = () => {};
+      (this._videoTexture as any).update = () => { };
     } else {
       //create canvases for video and counter textures
       const counterCanvas = document.createElement('canvas');
@@ -406,8 +405,14 @@ export default class Player {
   setTrackPath(track) {
     const path = this.paths[track % this.paths.length];
     if (!path) return;
-    this.video.src = path.replace('.uvol', '.mp4');
-    this.video.load();
+    this.resetWorker(track);
+    if (this.isV2 && this.fileHeader.texture.compression === "mp4") {
+      this.video.src = path.replace('.uvol', '.mp4');
+      this.video.load();
+    } else {
+      // TODO
+      console.log("Expecting a ktx2 texture");
+    }
   }
 
   drawVideoAndGetCurrentFrameNumber(): number {
@@ -446,15 +451,10 @@ export default class Player {
     return frameToPlay;
   }
 
-  resetWorker() {
-    const manifestFilePath = (this.manifestFilePath = this.video.src.replace(
-      '.mp4',
-      '.manifest'
-    ));
-    const meshFilePath = (this.meshFilePath = this.video.src.replace(
-      '.mp4',
-      '.uvol'
-    ));
+  resetWorker(track) {
+    const meshFilePath = this.paths[track % this.paths.length];
+    const manifestFilePath = meshFilePath.replace('uvol', 'manifest');
+    
     this.isWorkerReady = false;
     const xhr = new XMLHttpRequest();
     xhr.onreadystatechange = () => {
@@ -481,7 +481,7 @@ export default class Player {
       }); // Send data to our worker.
     };
 
-    xhr.open('GET', manifestFilePath, true); // true for asynchronous
+    xhr.open('GET', manifestFilePath, false); // false for synchronous
     xhr.send();
   }
 
