@@ -409,10 +409,8 @@ export default class Player {
     if (this.isV2 && this.fileHeader.texture.compression === "mp4") {
       this.video.src = path.replace('.uvol', '.mp4');
       this.video.load();
-    } else {
-      // TODO
-      console.log("Expecting a ktx2 texture");
     }
+    // ktx2 texture data will be baked into uvol file
   }
 
   drawVideoAndGetCurrentFrameNumber(): number {
@@ -454,7 +452,7 @@ export default class Player {
   resetWorker(track) {
     const meshFilePath = this.paths[track % this.paths.length];
     const manifestFilePath = meshFilePath.replace('uvol', 'manifest');
-    
+
     this.isWorkerReady = false;
     const xhr = new XMLHttpRequest();
     xhr.onreadystatechange = () => {
