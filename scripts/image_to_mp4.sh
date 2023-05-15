@@ -14,7 +14,6 @@ touch $TMP_FILE
 find "$INPUT" -type f \( -iname '*.jpg' -o -iname '*.png' \) -exec echo file \'{}\' >> $TMP_FILE \;
 ffmpeg -safe 0 -f concat -i $TMP_FILE -framerate $FRAME_RATE -vf scale=$WIDTH:$HEIGHT -c:v libx264 -pix_fmt yuv420p "$INTERMEDIATE_VIDEO_FILE"
 
-
-ffmpeg -i "$INTERMEDIATE_VIDEO_FILE" -i "$AUDIO_PATH" -map 0:v -map 1:a -c:v copy -shortest "$OUTPUT"
+ffmpeg -i "$INTERMEDIATE_VIDEO_FILE" -i "$AUDIO_PATH" -map 0:v -map 1:a -c:v copy -shortest -f mp4 "$OUTPUT"
 
 rm $TMP_FILE $INTERMEDIATE_VIDEO_FILE

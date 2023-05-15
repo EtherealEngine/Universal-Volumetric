@@ -27,7 +27,10 @@ function constructUVOL() {
   const configPath = process.argv[2]
   const rawConfig = fs.readFileSync(configPath)
   const config = JSON.parse(rawConfig)
+  
   const __dirname = path.dirname(fileURLToPath(import.meta.url))
+  config.outputDirectory = path.resolve(config.outputDirectory)
+  config.outputFile = path.join(config.outputDirectory, config.name + '.uvol')
 
   if (!config.dracoFilesPath && !config.OBJFilesPath) {
     /**
@@ -36,36 +39,46 @@ function constructUVOL() {
      * After this step, either OBJFilesPath or dracoFilesPath is definitely defined
      */
     const scriptPath = path.join(__dirname, '..', 'scripts', 'abc_to_obj.py')
-    config.OBJFilesPath = path.join(__dirname, '..', 'output', config.name, 'OBJ')
-    fs.mkdirSync(config.dracoFilesPath, { recursive: true });
-    console.log("Extracting frames from alembic file and converting them to OBJ files, directory: ", config.OBJFilesPath)
-    spawnSync('python3', [scriptPath, config.ABCFilePath, config.OBJFilesPath])
-    console.log("Done")
+    config.OBJFilesPath = path.join(config.outputDirectory, config.name, 'OBJ')
+    fs.mkdirSync(config.dracoFilesPath, { recursive: true })
+    console.log(
+      'Extracting frames from alembic file and converting them to OBJ files, directory: ',
+      config.OBJFilesPath
+    )
+    config.ABCFilePath = path.resolve(config.ABCFilePath)
+    const status = spawnSync('python3', [scriptPath, config.ABCFilePath, config.OBJFilesPath])
+    if (status.status) {
+      console.error('Error: ', status.stderr.toString('utf8'), status.stderr.toString('utf8').length)
+    } else console.log('Done')
   }
 
   if (!config.dracoFilesPath) {
     const scriptPath = path.join(__dirname, '..', 'scripts', 'objs_to_drcs.sh')
-    config.dracoFilesPath = path.join(__dirname, '..', 'output', config.name, 'DRC')
-    fs.mkdirSync(config.dracoFilesPath, { recursive: true });
-    console.log("Compressing OBJ files into DRACO files, directory: ", config.dracoFilesPath)
-    spawnSync('bash', [
+    config.dracoFilesPath = path.join(config.outputDirectory, config.name, 'DRC')
+    fs.mkdirSync(config.dracoFilesPath, { recursive: true })
+    console.log('Compressing OBJ files into DRACO files, directory: ', config.dracoFilesPath)
+    config.OBJFilesPath = path.resolve(config.OBJFilesPath)
+    const status = spawnSync('bash', [
       scriptPath,
-      config.OBJFilesPath,
-      config.dracoFilesPath,
-      config.COMPRESSION_LEVEL || "",
-      config.Q_POSITION_ATTR || "",
-      config.Q_TEXTURE_ATTR || "",
-      config.Q_NORMAL_ATTR || "",
-      config.Q_GENERIC_ATTR || ""
+      path.resolve(config.OBJFilesPath),
+      path.resolve(config.dracoFilesPath),
+      config.COMPRESSION_LEVEL || '',
+      config.Q_POSITION_ATTR || '',
+      config.Q_TEXTURE_ATTR || '',
+      config.Q_NORMAL_ATTR || '',
+      config.Q_GENERIC_ATTR || ''
     ])
-    console.log("Done")
+    if (status.status) {
+      console.error('Error: ', status.stdout.toString('utf8'))
+    } else console.log('Done')
   }
 
   if (config.textureType != 'ktx2' && !config.videoTextureInputPath) {
     const scriptPath = path.join(__dirname, '..', 'scripts', 'image_to_mp4.sh')
     config.videoTextureInputPath = config.outputFile.replace('uvol', 'mp4')
+    config.imageTextureInputPath = path.resolve(config.imageTextureInputPath)
     console.log('Creating video texture with images and audio: ', config.videoTextureInputPath)
-    spawnSync('bash', [
+    const status = spawnSync('bash', [
       scriptPath,
       config.imageTextureInputPath,
       config.videoTextureInputPath,
@@ -74,7 +87,9 @@ function constructUVOL() {
       config.height,
       config.audioPath
     ])
-    console.log('Done')
+    if (status.status) {
+      console.error('Error: ', status.stderr.toString('utf8'))
+    } else console.log('Done')
   }
 
   const manifestData = {

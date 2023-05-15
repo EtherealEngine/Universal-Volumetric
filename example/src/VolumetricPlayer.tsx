@@ -172,6 +172,7 @@ const VolumetricPlayer = (props: VolumetricPlayerProps) => {
           setIsBuffering(false);
         },
       });
+      playerRef.current.mesh.scale.setScalar(0.008);
       scene.add(playerRef.current.mesh as any);
     }
 
