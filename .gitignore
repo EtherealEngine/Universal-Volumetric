@@ -116,6 +116,7 @@ src/assets
 examples/assets
 src/worker/node_modules
 *.uvol
+!liamlow.uvol
 *.ply
 *.crt
 
@@ -136,6 +137,7 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 *.manifest
+!liamlow.manifest
 unity/.DS_Store
 .DS_Store
 

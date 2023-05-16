@@ -62,11 +62,11 @@ function constructUVOL() {
       scriptPath,
       path.resolve(config.OBJFilesPath),
       path.resolve(config.dracoFilesPath),
-      config.COMPRESSION_LEVEL || '',
-      config.Q_POSITION_ATTR || '',
-      config.Q_TEXTURE_ATTR || '',
-      config.Q_NORMAL_ATTR || '',
-      config.Q_GENERIC_ATTR || ''
+      config.COMPRESSION_LEVEL || '7',
+      config.Q_POSITION_ATTR || '11',
+      config.Q_TEXTURE_ATTR || '10',
+      config.Q_NORMAL_ATTR || '8',
+      config.Q_GENERIC_ATTR || '8'
     ])
     if (status.status) {
       console.error('Error: ', status.stdout.toString('utf8'))
