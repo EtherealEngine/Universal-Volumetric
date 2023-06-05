@@ -107,9 +107,10 @@ class DRACOLoader extends Loader {
 
 		// Check for an existing task using this buffer. A transferred buffer cannot be transferred
 		// again from this thread.
-		if ( _taskCache.has( buffer ) ) {
+		if ( 0 && _taskCache.has( buffer ) ) {
 
-			const cachedTask = _taskCache.get( buffer );
+			const cachedTask = -1;
+			// const cachedTask = _taskCache.get( buffer );
 
 			if ( cachedTask.key === taskKey ) {
 
@@ -174,12 +175,12 @@ class DRACOLoader extends Loader {
 			} );
 
 		// Cache the task result.
-		_taskCache.set( buffer, {
+		// _taskCache.set( buffer, {
 
-			key: taskKey,
-			promise: geometryPending
+		// 	key: taskKey,
+		// 	promise: geometryPending
 
-		} );
+		// } );
 
 		return geometryPending;
 

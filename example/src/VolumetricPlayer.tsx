@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import DracosisPlayer from 'universal-volumetric/dist/UVOLPlayer';
+import DracosisPlayer from 'universal-volumetric/dist/V1/player';
+import V2Player from 'universal-volumetric/dist/V2/player';
+import Player from "universal-volumetric/dist/Player";
 
 import {
   PerspectiveCamera,
@@ -26,14 +28,14 @@ const VolumetricPlayer = (props: VolumetricPlayerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<WebGLRenderer | null>(null);
-  const playerRef = useRef<DracosisPlayer | null>(null);
+  const playerRef = useRef<V2Player | null>(null);
   const anchorRef = useRef<Object3D | null>(null);
   const sceneRef = useRef<Object3D | null>(null);
   const cameraRef = useRef<PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   let animationFrameId: number;
   const [dracosisSequence, setDracosisSequence] =
-    useState<DracosisPlayer | null>(null);
+    useState<V2Player | null>(null);
   const [playIsStarted, setPlayIsStarted] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const [bufferingProgress, setBufferingProgress] = useState(0);
@@ -154,7 +156,7 @@ const VolumetricPlayer = (props: VolumetricPlayerProps) => {
     // scene.add(head);
 
     if (!playerRef.current) {
-      playerRef.current = new DracosisPlayer({
+      playerRef.current = Player({
         renderer,
         paths: props.paths,
         onMeshBuffering: (progress) => {
@@ -171,8 +173,9 @@ const VolumetricPlayer = (props: VolumetricPlayerProps) => {
         onFrameShow: () => {
           setIsBuffering(false);
         },
+        version: "2.0.0"
       });
-      playerRef.current.mesh.scale.setScalar(0.008);
+      // playerRef.current.mesh.scale.setScalar(0.001);
       scene.add(playerRef.current.mesh as any);
     }
 

@@ -7,7 +7,7 @@ console.log('import.meta.url', import.meta.url);
 
 function App() {
   const [playerVisible, setPlayerVisible] = useState(false);
-  const paths = ['/liamlow.uvol'];
+  const paths = ['/yoga.uvol'];
   return (
     <div className="App">
       <button

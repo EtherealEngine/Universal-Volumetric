@@ -8,7 +8,7 @@
   "dependencies": {
     "react": "^17.0.0",
     "react-dom": "^17.0.0",
-    "three": "^0.141.0",
+    "three": "^0.152.2",
     "three-stdlib": "^2.10.1",
     "universal-volumetric": "file:.."
   },
