@@ -8,12 +8,10 @@
     "url": "git://github.com/EtherealEngine/Universal-Volumetric.git"
   },
   "scripts": {
-    "postinstall": "python3 -m pip install -r requirements.txt",
     "test": "echo \"Error: no test specified\" && exit 1",
     "build-player": "tsc",
-    "build-worker": "vite build --config vite.worker.config.ts && vite build --config vite.worker-v1.config.ts",
-    "copy-files": "cp src/lib/draco_decoder.wasm dist/lib/draco_decoder.wasm",
-    "build": "npm run build-player && npm run build-worker && npm run copy-files"
+    "build-worker": "vite build --config vite.worker.config.ts",
+    "build": "npm run build-player && npm run build-worker"
   },
   "license": "MIT",
   "bugs": {
@@ -30,7 +28,7 @@
     "draco3d": "^1.5.6",
     "glob": "7.2.0",
     "ngrok": "^5.0.0-beta.2",
-    "three": "^0.151.3",
+    "three": "0.153.0",
     "xmlhttprequest": "^1.8.0"
   },
   "devDependencies": {

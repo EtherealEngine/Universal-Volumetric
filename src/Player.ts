@@ -53,7 +53,7 @@ export default function Player({
     onFrameShow = null,
     worker = null,
     material = new MeshBasicMaterial(),
-    version = '1.0.0'
+    version = '1.0.0',
 }: PlayerConstructorArgs) {
     if (!version || version !== '2.0.0') {
         return new V1Player({
@@ -76,7 +76,6 @@ export default function Player({
             paths,
             onMeshBuffering,
             onFrameShow,
-            material
         });
     }
 }

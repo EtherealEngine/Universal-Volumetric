@@ -4,9 +4,9 @@ export default defineConfig({
   // ...
   build: {
     lib: {
-      fileName: 'worker.build',
+      fileName: 'V1/worker.build',
       formats: ['es'],
-      entry: 'src/UVOLPlayerWorker.ts',
+      entry: 'src/V1/worker.ts',
     },
 
     emptyOutDir: false,

@@ -9,6 +9,7 @@ import {
   Vector3,
   WebGLRenderer,
   sRGBEncoding,
+  SRGBColorSpace,
   Object3D,
   Group,
 } from 'three';
@@ -20,7 +21,7 @@ const cameraVerticalOffset = 0.4;
 const cameraFov = 35;
 
 type VolumetricPlayerProps = {
-  paths: Array<string>;
+  paths?: Array<string>;
   style: any;
 };
 
@@ -92,7 +93,7 @@ const VolumetricPlayer = (props: VolumetricPlayerProps) => {
       camera.position.set(0, cameraOrbitingHeight, cameraDistance);
       camera.lookAt(controls.target);
     }
-    renderer.outputEncoding = sRGBEncoding;
+    renderer.outputColorSpace = SRGBColorSpace;
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(w, h);
     (container as any).appendChild(renderer.domElement);
@@ -175,7 +176,7 @@ const VolumetricPlayer = (props: VolumetricPlayerProps) => {
         },
         version: "2.0.0"
       });
-      // playerRef.current.mesh.scale.setScalar(0.001);
+      playerRef.current.mesh.scale.setScalar(0.001);
       scene.add(playerRef.current.mesh as any);
     }
 

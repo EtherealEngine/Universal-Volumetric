@@ -1,19 +1,14 @@
-import React, { useState } from 'react';
-import logo from './logo.svg';
-import './App.css';
-import VolumetricPlayer from './VolumetricPlayer';
-
-console.log('import.meta.url', import.meta.url);
+import React, { useState } from 'react'
+import logo from './logo.svg'
+import './App.css'
+import VolumetricPlayer from './VolumetricPlayer'
 
 function App() {
-  const [playerVisible, setPlayerVisible] = useState(false);
-  const paths = ['/yoga.uvol'];
+  const [playerVisible, setPlayerVisible] = useState(false)
+  const paths = ['/liamlow.uvol']
   return (
     <div className="App">
-      <button
-        className={'button player-toggle'}
-        onClick={() => setPlayerVisible(!playerVisible)}
-      >
+      <button className={'button player-toggle'} onClick={() => setPlayerVisible(!playerVisible)}>
         {playerVisible ? 'off' : 'on'}
       </button>
       {!playerVisible ? null : (
@@ -24,12 +19,12 @@ function App() {
             top: 0,
             left: 0,
             width: '100vw',
-            height: '100vh',
+            height: '100vh'
           }}
         />
       )}
     </div>
-  );
+  )
 }
 
-export default App;
+export default App

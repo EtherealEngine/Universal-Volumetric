@@ -1,21 +1,13 @@
 import {
     BufferGeometry,
-    Float32BufferAttribute,
-    LinearFilter,
     Mesh,
     MeshBasicMaterial,
-    MeshStandardMaterial,
     ShaderMaterial,
     PlaneGeometry,
-    // sRGBEncoding,
     SRGBColorSpace,
-    Texture,
-    Uint16BufferAttribute,
     CompressedArrayTexture,
     WebGLRenderer,
-    Vector2,
     GLSL3,
-    Clock
 } from 'three'
 
 import { DRACOLoader } from '../lib/DRACOLoader';
@@ -38,40 +30,70 @@ export type PlayerConstructorArgs = {
     paths: Array<string>
     onMeshBuffering?: onMeshBufferingCallback
     onFrameShow?: onFrameShowCallback
-    material?: MeshBasicMaterial | MeshBasicMaterial
+}
+
+export type FileHeader = {
+    DRCURLPattern: string
+    KTX2URLPattern: string
+    AudioURL: string
+    BatchSize: number
+    TotalFrames: number
+    FrameRate: number
 }
 
 export default class Player {
-    static defaultWorkerURL = new URL('./worker.build.js', import.meta.url).href
-
     // Public Fields
     public renderer: WebGLRenderer
     public playMode: PlayMode
+    public geometryBufferSize: number = 200
+    public textureBufferSize: number = 40
+    public minFramesRequired: number = 50 // If atleast these many frames aren't loaded, the video buffers.
+    public minSegmentsRequired: number = 10 // If atleast these many segments aren't loaded, the video buffers.
 
     // Three objects
-    public mesh: Mesh
     public paths: Array<string>
-    public material: MeshBasicMaterial
-    public failMaterial?: MeshBasicMaterial
+    public mesh: Mesh
+    private ktx2Loader: KTX2Loader
+    private dracoLoader: DRACOLoader
+    private material: ShaderMaterial | null = null
 
     // Private Fields
-    private currentFrame: number = 0
-    private currentSegment: number = 0
+    private audioTime: number = 0
     private currentTrack: number = 0
     private meshMap: Map<number, BufferGeometry> = new Map()
     private textureMap: Map<number, CompressedArrayTexture> = new Map()
     private onMeshBuffering: onMeshBufferingCallback | null = null
     private onFrameShow: onFrameShowCallback | null = null
+    private lastRequestedGeometryFrame: number
+    private lastRequestedTextureSegment: number
+    private audio: HTMLAudioElement
+    private fileHeader: FileHeader
+    private vertexShader: string
+    private fragmentShader: string
 
-    private manifestData: any;
-    private ktx2Loader: KTX2Loader
-    private dracoLoader: DRACOLoader
-    private clock: Clock
-    private pendingFetchRequest: number
-    private lastRequestedSegment: number
-    private lastPlayedTexture: number
-    private totalFrameCount: number
+    get totalFrameCount(): number {
+        return this.fileHeader.TotalFrames
+    }
 
+    get batchSize(): number {
+        return this.fileHeader.BatchSize
+    }
+
+    get totalSegmentCount(): number {
+        return Math.ceil(this.totalFrameCount / this.batchSize)
+    }
+
+    get currentFrame(): number {
+        return Math.floor(this.audioTime * this.fileHeader.FrameRate)
+    }
+
+    get currentSegment(): number {
+        return Math.floor(this.currentFrame / this.batchSize)
+    }
+
+    get currentTrackData() {
+        return this.paths[this.currentTrack]
+    }
 
 
     constructor({
@@ -80,7 +102,6 @@ export default class Player {
         paths,
         onMeshBuffering,
         onFrameShow,
-        material
     }: PlayerConstructorArgs) {
         this.renderer = renderer
 
@@ -89,8 +110,8 @@ export default class Player {
 
         this.paths = paths
 
-        // backwards-compat
         if (typeof playMode === 'number') {
+            /* Backward compatibility */
             switch (playMode) {
                 case 1:
                     playMode = PlayMode.single
@@ -108,21 +129,42 @@ export default class Player {
         }
 
         this.playMode = playMode || PlayMode.loop
-        this.material = material
-        this.mesh = new Mesh(new PlaneGeometry(0.00001, 0.00001), new MeshStandardMaterial({ color: 0xffffff }))
+        console.log(this.playMode)
+
+        /* This property is used by the parent components and rendered on the scene */
+        this.mesh = new Mesh(new PlaneGeometry(0.00001, 0.00001), new MeshBasicMaterial({ color: 0xffffff }))
+
         this.ktx2Loader = new KTX2Loader();
-        this.ktx2Loader.setTranscoderPath("/");
+        this.ktx2Loader.setTranscoderPath("https://unpkg.com/three@0.153.0/examples/jsm/libs/basis/");
         this.ktx2Loader.detectSupport(this.renderer);
 
         this.dracoLoader = new DRACOLoader();
-        this.dracoLoader.setDecoderPath("/");
+        this.dracoLoader.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.4.3/");
         this.dracoLoader.preload();
 
-        this.clock = new Clock();
-        this.pendingFetchRequest = 0
-        this.lastRequestedSegment = -1
-        this.lastPlayedTexture = 0
+        this.audio = document.createElement('audio')
         this.prepareNextLoop()
+
+        this.vertexShader = `uniform vec2 size;
+        out vec2 vUv;
+
+        void main() {
+            gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+            vUv = uv;
+        }`
+        this.fragmentShader = `
+        
+        
+        precision highp sampler2DArray;
+        uniform sampler2DArray diffuse;
+        in vec2 vUv;
+        uniform int depth;
+        out vec4 outColor;
+        
+        void main() {
+            vec4 color = texture2D( diffuse, vec3( vUv, depth ) );
+            outColor = LinearTosRGB(color);
+        }`
     }
 
     prepareNextLoop = () => {
@@ -137,228 +179,184 @@ export default class Player {
             nextTrack = (this.currentTrack + 1) % this.paths.length
         }
         this.currentTrack = nextTrack
-        console.log('new track: ', this.currentTrack)
-        this.currentFrame = 0;
-        this.lastPlayedTexture = 0
-        this.lastRequestedSegment = -1
-        this.fetchManifest();
-        const currentBatchSize = this.manifestData.batchSize
-        this.totalFrameCount = ((this.manifestData.sequences.length - 1) * currentBatchSize) + (this.manifestData.sequences.slice(-1)[0].length - 2)
-    }
+        this.audioTime = 0;
+        this.lastRequestedGeometryFrame = this.lastRequestedTextureSegment = -1
+        const manifestFilePath = this.paths[this.currentTrack].replace('uvol', 'manifest')
 
-    fetchManifest = () => {
-        const manifestFilePath = this.paths[this.currentTrack].replace('uvol', 'manifest');
         const xhr = new XMLHttpRequest()
         xhr.onreadystatechange = () => {
             if (xhr.readyState !== 4) return
-            this.manifestData = JSON.parse(xhr.responseText)
+            this.fileHeader = JSON.parse(xhr.responseText)
         }
-
-        xhr.open('GET', manifestFilePath, false) // true for asynchronous
+        xhr.open('GET', manifestFilePath, false) // false for synchronous
         xhr.send()
+        this.audio.src = this.fileHeader.AudioURL
+        this.audio.currentTime = 0
+        console.info('Playing new track: ', this.currentTrack)
     }
 
-    getNextSegmentToRequest = (loaded, notLoaded) => {
-        let nextSegmentToRequest = Math.floor(notLoaded / this.manifestData.batchSize)
-        while (loaded <= notLoaded) {
-            const mid = Math.floor((loaded + notLoaded) / 2)
-            if (!this.meshMap.has(mid)) {
-                nextSegmentToRequest = Math.floor(mid / this.manifestData.batchSize)
-                notLoaded = mid
-            } else {
-                loaded = mid
+    /**
+     * Utility function to pad 'n' with 'width' number of '0' characters.
+     * This is used when expanding URLs, which are filled with '#'
+     * For example: frame_#### is expanded to frame_0000, frame_0010, frame_0100 etc...
+     */
+    pad(n: number, width: number) {
+        const padChar = '0';
+        let paddedN = n.toString()
+        return paddedN.length >= width ? paddedN : new Array(width - paddedN.length + 1).join(padChar) + paddedN;
+    }
+
+    countHashChar(URL: string) {
+        let count = 0
+        for (let i = 0; i < URL.length; i++) {
+            if (URL[i] === '#') {
+                count++
             }
         }
-        return nextSegmentToRequest
+        return count
     }
 
+    /**
+     * Fetches buffers according to Leaky Bucket algorithm.
+     * If meshMap has less than required meshes, we keep fetching meshes. Otherwise, we keep fetching meshes.
+     * Same goes for textures.
+     */
     fetchBuffers = () => {
-        if (this.lastRequestedSegment == (this.manifestData.sequences.length - 1)) {
-            return;
-        }
-        const currentSegment = this.lastRequestedSegment + 1
-        const minNeededSegments = 3;
-        const nextSegment = Math.min(this.manifestData.sequences.length - 1, currentSegment + minNeededSegments - 1)
-        const totalSegmentsToBeRequested = nextSegment - currentSegment + 1;
-        // console.log(`Pending Requests: ${this.pendingFetchRequest}, MeshMap.size = ${this.meshMap.size}, TextureMap.size = ${this.textureMap.size}`);
-
-        if (this.pendingFetchRequest > 0) {
-            console.log('\tpending: ', this.pendingFetchRequest);
-            return;
-        }
-
-        this.pendingFetchRequest += totalSegmentsToBeRequested;
-        console.log(`Fetching segments: [${currentSegment}, ${nextSegment}], pendingRequests: ${this.pendingFetchRequest}`)
-        for (let segmentNo = currentSegment; segmentNo <= nextSegment; segmentNo++) {
-            const segmentData = this.manifestData.sequences[segmentNo];
-            const currentFrameCount = segmentData.length - 2;
-            const startFrame = segmentNo * this.manifestData.batchSize, endFrame = segmentNo * this.manifestData.batchSize + currentFrameCount - 1
-            if (this.textureMap.has(segmentNo) || this.meshMap.has(startFrame)) {
-                console.log('ignoring segment, cuz we already have that: ', segmentNo)
-                this.pendingFetchRequest--
-                continue;
-            }
-
-
-
-            const requestStart = segmentData[0]
-            const requestEnd = (segmentNo == (this.manifestData.sequences.length - 1)) ? "" : segmentData[currentFrameCount + 1]
-            this.lastRequestedSegment = segmentNo
-            fetch(this.paths[this.currentTrack], {
-                headers: {
-                    range: `bytes=${requestStart}-${requestEnd}`
-                }
-            }).then(response => response.arrayBuffer()).then(buffer => {
-                const offSet = segmentData[0]
-                this.decodeKTX2(buffer.slice(segmentData[0] - offSet, segmentData[1] - offSet), segmentNo);
-                for (let frameNo = startFrame; frameNo <= endFrame; frameNo++) {
-                    this.decodeDraco(buffer.slice(segmentData[frameNo - startFrame + 1] - offSet, segmentData[frameNo - startFrame + 2] - offSet), frameNo)
-                }
+        if (this.meshMap.size < this.geometryBufferSize && this.lastRequestedGeometryFrame != (this.fileHeader.TotalFrames - 1)) {
+            const padWidth = this.countHashChar(this.fileHeader.DRCURLPattern)
+            const currentRequestingFrame = this.lastRequestedGeometryFrame + 1
+            const dracoURL = this.fileHeader.DRCURLPattern.replace(
+                '#'.repeat(padWidth), this.pad(currentRequestingFrame, padWidth))
+            this.decodeDraco(dracoURL).then((mesh: BufferGeometry) => {
+                this.meshMap.set(currentRequestingFrame, mesh)
             })
+            this.lastRequestedGeometryFrame = currentRequestingFrame
+        }
+        if (this.textureMap.size < this.textureBufferSize && this.lastRequestedTextureSegment != (this.totalSegmentCount - 1)) {
+            const padWidth = this.countHashChar(this.fileHeader.KTX2URLPattern)
+            const currentRequestingTextureSegment = this.lastRequestedTextureSegment + 1
+            const textureURL = this.fileHeader.KTX2URLPattern.replace(
+                '#'.repeat(padWidth), this.pad(currentRequestingTextureSegment, padWidth))
+            this.decodeKTX2(textureURL).then((texture: CompressedArrayTexture) => {
+                this.textureMap.set(currentRequestingTextureSegment, texture)
+            })
+            this.lastRequestedTextureSegment = currentRequestingTextureSegment
+        }
+        if (this.audio.ended || (this.currentFrame + 1) >= this.totalFrameCount) {
+            this.prepareNextLoop()
         }
     }
 
-    decodeDraco = (buffer, frameIndex) => {
-        const dracoTaskConfig = {
-            attributeIDs: {
-                position: 'POSITION',
-                normal: 'NORMAL',
-                color: 'COLOR',
-                uv: 'TEX_COORD',
-            },
-            attributeTypes: {
-                position: 'Float32Array',
-                normal: 'Float32Array',
-                color: 'Float32Array',
-                uv: 'Float32Array',
-            },
-            useUniqueIDs: false,
-            vertexColorSpace: SRGBColorSpace,
-        };
-        this.dracoLoader.decodeGeometry(
-            buffer,
-            dracoTaskConfig
-        ).then(decodedDraco => {
-            this.meshMap.set(frameIndex, decodedDraco);
+    decodeDraco = (dracoURL: string): Promise<BufferGeometry> => {
+        return new Promise((resolve, reject) => {
+            this.dracoLoader.load(dracoURL, function (geometry: BufferGeometry) {
+                resolve(geometry)
+            }, undefined, function (error: any) {
+                reject(error)
+            })
         })
     }
 
-    decodeKTX2 = (buffer, segmentIndex) => {
-        this.ktx2Loader._createTexture(buffer).then(decodedTexture => {
-            const decodedMaterial = new ShaderMaterial({
-                uniforms: {
-                    diffuse: {
-                        value: decodedTexture,
-                    },
-                    depth: {
-                        value: 0,
-                    },
-                    size: { value: new Vector2(4096, 4096) },
-                },
-                vertexShader: `uniform vec2 size;
-            out vec2 vUv;
-            
-            void main() {
-                gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-                vUv = uv;
-            }`,
-                fragmentShader: `precision highp float;
-            precision highp int;
-            precision highp sampler2DArray;
-            
-            uniform sampler2DArray diffuse;
-            in vec2 vUv;
-            uniform int depth;
-            out vec4 outColor;
-            
-            void main() {
-                vec4 color = texture( diffuse, vec3( vUv, depth ) );
-                outColor = vec4(color.rgb, 1.0 );
-            }`,
-                glslVersion: GLSL3,
-            });
-            // @ts-ignore
-            this.textureMap.set(segmentIndex, decodedMaterial);
-            this.pendingFetchRequest -= 1
+    decodeKTX2 = (textureURL: string): Promise<CompressedArrayTexture> => {
+        return new Promise((resolve, reject) => {
+            this.ktx2Loader.load(textureURL, function (texture) {
+                resolve(texture);
+            }, undefined, function (error: any) {
+                reject(error)
+            })
         })
     }
 
     processFrame = () => {
-        const previousFrameInt = Math.round(this.currentFrame)
-        const previousSegment = Math.floor(previousFrameInt / this.manifestData.batchSize);
-        const thresholdFrame = previousFrameInt + 1;
-        const thresholdSegment = Math.floor(thresholdFrame / this.manifestData.batchSize);
-        const canPlay = (this.meshMap.has(previousFrameInt) &&
-            this.meshMap.has(thresholdFrame) &&
-            this.textureMap.has(previousSegment) &&
-            this.textureMap.has(thresholdSegment))
+        const nextThresholdFrame = Math.min(this.currentFrame + this.minFramesRequired, this.totalFrameCount - 1)
+        const nextThresholdSegment = Math.min(this.currentSegment + this.minSegmentsRequired, this.totalSegmentCount - 1)
 
-        // console.log(previousFrameInt, Array.from(this.meshMap), Array.from(this.textureMap))
+
+        const canPlay = (
+            this.meshMap.has(this.currentFrame) &&
+            this.meshMap.has(nextThresholdFrame) &&
+            this.textureMap.has(this.currentSegment) &&
+            this.textureMap.has(nextThresholdSegment)
+        )
+
         if (!canPlay) {
-            this.clock.running = false // pausing the clock
-            // console.log('pausing the clock', this.meshMap.size, this.textureMap.size, this.meshMap.has(previousFrameInt), this.meshMap.has(thresholdFrame), this.textureMap.has(previousSegment), this.textureMap.has(thresholdSegment), Array.from(this.meshMap.keys()), Array.from(this.textureMap.keys()), previousFrameInt)
+            this.onMeshBuffering(this.meshMap.size / this.minFramesRequired)
+            if (!this.audio.paused) {
+                console.log('pausing', this.meshMap.size, this.textureMap.size)
+                this.audio.pause()
+            }
             return;
         }
 
 
-        if (!this.clock.running) {
-            // continuing again
-            this.clock.running = true
-            this.clock.start() // sets date to current date time
-            console.log('restarted clock')
+        if (this.audio.paused) {
+            console.log('playing', this.meshMap.size, this.textureMap.size)
+            this.audio.play()
         }
 
-        const delta = this.clock.getDelta() // in seconds
-        this.currentFrame += delta * this.manifestData.frameRate;
-        const currentFrameInt = Math.round(this.currentFrame)
-        console.log('delta: ', delta, 'playing frame no: ', currentFrameInt)
-        const currentBatchSize = this.manifestData.batchSize
-        const offSet = currentFrameInt % currentBatchSize;
+        this.audioTime = this.audio.currentTime;
+        this.onFrameShow(this.currentFrame)
+        const offSet = this.currentFrame % this.batchSize;
 
-        if (currentFrameInt >= this.totalFrameCount) {
-            this.prepareNextLoop()
-        }
-
-        this.currentSegment = Math.floor(currentFrameInt / currentBatchSize);
-
-        if (!this.meshMap.has(currentFrameInt) || !this.textureMap.has(this.currentSegment)) {
-            this.onMeshBuffering?.(0)
-            return;
-        }
-
-
-        this.onFrameShow?.(currentFrameInt);
-        this.mesh.geometry = this.meshMap.get(currentFrameInt)
+        this.onFrameShow?.(this.currentFrame);
+        this.mesh.geometry = this.meshMap.get(this.currentFrame)
         this.mesh.geometry.attributes.position.needsUpdate = true;
-        if (offSet == 0 || this.lastPlayedTexture != this.currentSegment) {
-            /* this video texture is a new segment */
-
-            // @ts-ignore
-            this.mesh.material = this.textureMap.get(this.currentSegment);
-
-            // @ts-ignore
-            this.mesh.material.needsUpdate = true;
-
-            this.lastPlayedTexture = this.currentSegment
+        if (offSet == 0) {
+            /* this video texture is a new segment, updating mesh's material with new segment's material */
+            if (!this.material) {
+                this.material = new ShaderMaterial({
+                    uniforms: {
+                        diffuse: {
+                            value: this.textureMap.get(this.currentSegment),
+                        },
+                        depth: {
+                            value: 0,
+                        },
+                    },
+                    vertexShader: this.vertexShader,
+                    fragmentShader: this.fragmentShader,
+                    glslVersion: GLSL3,
+                });
+                this.mesh.material = this.material
+            } else {
+                this.mesh.material = this.material.clone()
+                // this.material.dispose()
+                // @ts-ignore
+                this.mesh.material.uniforms = {
+                    diffuse: {
+                        value: this.textureMap.get(this.currentSegment),
+                    },
+                    depth: {
+                        value: 0,
+                    },
+                }
+            }
+            (this.mesh.material as ShaderMaterial).needsUpdate = true;
+            console.log('material changed')
+        } else {
+            // updating texture within CompressedArrayTexture
+            (this.mesh.material as ShaderMaterial).uniforms['depth'].value = offSet;
         }
-
-        (this.mesh.material as ShaderMaterial).uniforms['depth'].value = offSet;
     }
 
     removePlayedBuffer() {
-        const currentFrameInt = Math.round(this.currentFrame)
-        /* remove played buffer */
-        for (const [key, buffer] of this.meshMap.entries()) {
-            if (key < currentFrameInt) {
-                buffer.dispose()
-                this.meshMap.delete(key)
+        const previousFrame = this.currentFrame - 1
+        const previousSegment = this.currentSegment - 1
+        if (previousFrame >= 0) {
+            for (const [key, buffer] of this.meshMap.entries()) {
+                if (key < previousFrame) {
+                    buffer.dispose()
+                    this.meshMap.delete(key)
+                }
             }
         }
 
-        for (const [key, buffer] of this.textureMap.entries()) {
-            if (key < this.currentSegment) {
-                buffer.dispose()
-                this.textureMap.delete(key)
+        if (previousSegment >= 0) {
+            for (const [key, buffer] of this.textureMap.entries()) {
+                if (key < previousSegment) {
+                    buffer.dispose()
+                    this.textureMap.delete(key)
+                }
             }
         }
     }
