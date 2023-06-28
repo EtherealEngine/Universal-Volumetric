@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 
 import io
-from contextlib import redirect_stdout, redirect_stderr
+from contextlib import redirect_stdout
 
 
 def check_executables():

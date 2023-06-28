@@ -1,18 +1,56 @@
 # Universal Volumetric
 
-### The open source Universal Volumetric (".uvol") compressed interchange format for streaming mesh sequences. 
+The open source Universal Volumetric (".uvol") compressed interchange format for streaming mesh sequences.
 
-#### This tech was built in partnership with Wild Capture and others. 
+## UVOL 2
 
-You can see an example on Wild Capture's site, here: http://wildcapture.co/volumetric.html
+UVOL2 introduces usage of Compressed Array Textures, in the form of KTX2 containerized files. These support wide variety of devices due to on the fly transcoding and due to KTX2's small file size, it comes with bandwidth advantages.
 
-This project  includes a cross-platform player implementation using h.264 video for texture encoding and Draco and Corto compression for GLTF 3D model.
+In this version, we also changed the geometry compression method from Corto to DRACO. Current version of UVOL2 needs directories of files which represent individual frames, and a manifest file which points to these directories. The Encoder helps you to convert the data you have to the data player needs. The encoder script is located at: [`scripts/Encoder.py`](scripts/Encoder.py).
 
-The initial version focuses on performance. Currently, single material mesh sequences of any length are supported. The next version will focus on higher compression ratio, streamability and integration into USD and glTF.
+User have to input a `config.json` file to the Encoder script. This config file is processed in a certain order that is explained below.
 
-The current implementation uses the MIT-licensed Corto codec from CNR-ISTI Visual Computing Group, which has fast compression and especially fast decompression characteristics.
+```ts
+{
+    name: string,
+    ABCFilePath: string,
+    OBJFilesPath: string,
+    DRACOFilesPath: string,
+    Q_POSITION_ATTR: number,
+    Q_TEXTURE_ATTR: number,
+    Q_NORMAL_ATTR: number,
+    Q_GENERIC_ATTR: number,
+    DRACO_COMPRESSION_LEVEL: number,
+    IMAGES_PATH: string,
+    KTX2_FIRST_FILE: number,
+    KTX2_FILE_COUNT: number,
+    KTX2_BATCH_SIZE: number,
+    KTX2FilesPath: string,
+    FRAME_RATE: number,
+    AudioURL: string,
+    OutputDirectory: string
+}
+```
+
+Above is the type spec for the config file. It is not required to specify all the fields in the config file.
+
+Let's start with mandatory fields.
+
+- **`name`**: This represents the name of the manifest file (or) basically to denote a particular Volumetric video.
+- **`FRAME_RATE`**: As the name suggests, this represents the frame rate of the volumetric video.
+- **`KTX2_BATCH_SIZE`**: This represents number of frames are packed (or to be packed) in a single KTX2 video texture.
+- **`OutputDirectory`**: The processed files are stored in this directory (labelled with their formats).
+
+Now, we discuss about how geometry data is processed: ![](https://i.imgur.com/HC0xuOO.png)
+
+Followed by texture data processing: ![](https://i.imgur.com/xQs4uQR.png)
+
+### Demo
+
+Here's a short sped up version of encoder on duty! [![asciicast](https://asciinema.org/a/593720.png)](https://asciinema.org/a/593720)
 
 ### Collaborators Wanted!
+
 If you are proficient in C++, python, JS, Unity/C#, or you want to support this project creatively or financially, please get in touch!
 
 ### Example
@@ -21,58 +59,12 @@ Current uvol files consist of a .uvol binary, manifest file and video texture. F
 
 Currently playback works in WebGL with three.js and Unity. Android and iOS are in development, Unreal support is on the roadmap (intrepid C++ developers should be able to port this in a day by reading the source from other examples, since the core codec is C++ based).
 
-## Requirements
-For encoding, you will need Node.js 12+ and Python 3 installed.
+### Requirements
+
+For encoding, you will Python 3 and blender python package installed.
 
 For decoding, currently WebGL is supported (especially three.js), Unreal and Unity will come in the next release.
 
-You will need a mesh and texture sequence in OBJ/PNG or OBJ/PLY.
+You will need a mesh and texture sequence in ABC/OBJ and PNG/JPG formats respectively.
 
-Encoded .uvol files are cross platform, but currently the decoder is written for the web only. Want Unity, Unreal, examples in PlayCanvas and Babylon, etc? Submit and issue and sponsor our project:
-https://opencollective.com/etherealengine
-
-Or find us on Discord!
-https://discord.gg/xrf
-
-## Dev Setup
-
-Clone this repository and run the following commands to run the `example`.
-
-Place draco geometry files in `assets` directory and run `Encoder.js` script.
-
-### See help for more details
-
-```
-❯ node Encoder.js --help
-Usage: universal-volumetric [options] <output-file-name>
-
-CLI to encoder geometry files into UVOL format
-
-Arguments:
-  output-file-name                    Output filename
-
-Options:
-  -V, --version                       output the version number
-  -gc, --geometry-compression <type>  Compression type of 3D geometries
-  -tc, --texture-compression <type>   Compression type of 3D textures. Default value: mp4
-  -f, --framerate <value>             Frame rate of the output volumetric video. Default value: 30 fps
-  -v, --verbose
-  -i, --input-path <path>             Directory that contains 3d models (drc or crt files)
-  --start-frame <value>               Default value: 0
-  --end-frame <value>                 Default value: Total number of frames - 1
-  -h, --help                          display help for command
-```
-
-#### Sample command
-
-```
-node Encoder.js -v -gc draco -i assets -f 30 liam.uvol
-```
-
-```bash
-yarn install
-npm run build # builds files into "dist" directory
-cd example/
-npm install
-npm run dev
-```
+Find us on Discord! https://discord.gg/xrf
