@@ -45,8 +45,8 @@ export default class Player {
     // Public Fields
     public renderer: WebGLRenderer
     public playMode: PlayMode
-    public geometryBufferSize: number = 200
-    public textureBufferSize: number = 40
+    public geometryBufferSize: number = 75
+    public textureBufferSize: number = 15
     public minFramesRequired: number = 50 // If atleast these many frames aren't loaded, the video buffers.
     public minSegmentsRequired: number = 10 // If atleast these many segments aren't loaded, the video buffers.
 
@@ -84,7 +84,7 @@ export default class Player {
     }
 
     get currentFrame(): number {
-        return Math.floor(this.audioTime * this.fileHeader.FrameRate)
+        return Math.round(this.audioTime * this.fileHeader.FrameRate)
     }
 
     get currentSegment(): number {
@@ -144,6 +144,9 @@ export default class Player {
 
         this.audio = document.createElement('audio')
         this.prepareNextLoop()
+        setInterval(() => {
+            this.fetchBuffers();
+        }, 500);
 
         this.vertexShader = `uniform vec2 size;
         out vec2 vUv;
@@ -178,6 +181,7 @@ export default class Player {
         } else {
             nextTrack = (this.currentTrack + 1) % this.paths.length
         }
+        this.dispose();
         this.currentTrack = nextTrack
         this.audioTime = 0;
         this.lastRequestedGeometryFrame = this.lastRequestedTextureSegment = -1
@@ -222,52 +226,43 @@ export default class Player {
      * Same goes for textures.
      */
     fetchBuffers = () => {
-        if (this.meshMap.size < this.geometryBufferSize && this.lastRequestedGeometryFrame != (this.fileHeader.TotalFrames - 1)) {
-            const padWidth = this.countHashChar(this.fileHeader.DRCURLPattern)
-            const currentRequestingFrame = this.lastRequestedGeometryFrame + 1
-            const dracoURL = this.fileHeader.DRCURLPattern.replace(
-                '#'.repeat(padWidth), this.pad(currentRequestingFrame, padWidth))
-            this.decodeDraco(dracoURL).then((mesh: BufferGeometry) => {
-                this.meshMap.set(currentRequestingFrame, mesh)
-            })
-            this.lastRequestedGeometryFrame = currentRequestingFrame
+        if ((this.lastRequestedGeometryFrame - this.currentFrame) < this.geometryBufferSize && this.lastRequestedGeometryFrame != (this.totalFrameCount - 1)) {
+            let currentRequestingFrame = this.lastRequestedGeometryFrame + 1;
+            this.lastRequestedGeometryFrame = Math.min(this.currentFrame + this.geometryBufferSize, this.totalFrameCount - 1);
+            for (; currentRequestingFrame <= this.lastRequestedGeometryFrame; currentRequestingFrame++) {
+                const padWidth = this.countHashChar(this.fileHeader.DRCURLPattern);
+                const dracoURL = this.fileHeader.DRCURLPattern.replace('#'.repeat(padWidth), this.pad(currentRequestingFrame, padWidth));
+                this.decodeDraco(dracoURL, currentRequestingFrame);
+            }
         }
-        if (this.textureMap.size < this.textureBufferSize && this.lastRequestedTextureSegment != (this.totalSegmentCount - 1)) {
-            const padWidth = this.countHashChar(this.fileHeader.KTX2URLPattern)
-            const currentRequestingTextureSegment = this.lastRequestedTextureSegment + 1
-            const textureURL = this.fileHeader.KTX2URLPattern.replace(
-                '#'.repeat(padWidth), this.pad(currentRequestingTextureSegment, padWidth))
-            this.decodeKTX2(textureURL).then((texture: CompressedArrayTexture) => {
-                this.textureMap.set(currentRequestingTextureSegment, texture)
-            })
-            this.lastRequestedTextureSegment = currentRequestingTextureSegment
+        if ((this.lastRequestedTextureSegment - this.currentSegment) < this.textureBufferSize && this.lastRequestedTextureSegment != (this.totalSegmentCount - 1)) {
+            let currentRequestingTextureSegment = this.lastRequestedTextureSegment + 1;
+            this.lastRequestedTextureSegment = Math.min(this.currentSegment + this.textureBufferSize, this.totalSegmentCount - 1);
+            for (; currentRequestingTextureSegment <= this.lastRequestedTextureSegment; currentRequestingTextureSegment++) {
+                const padWidth = this.countHashChar(this.fileHeader.KTX2URLPattern);
+                const textureURL = this.fileHeader.KTX2URLPattern.replace('#'.repeat(padWidth), this.pad(currentRequestingTextureSegment, padWidth));
+                this.decodeKTX2(textureURL, currentRequestingTextureSegment);
+            }
         }
         if (this.audio.ended || (this.currentFrame + 1) >= this.totalFrameCount) {
-            this.prepareNextLoop()
-        }
+            this.prepareNextLoop();
+        }        
     }
 
-    decodeDraco = (dracoURL: string): Promise<BufferGeometry> => {
-        return new Promise((resolve, reject) => {
-            this.dracoLoader.load(dracoURL, function (geometry: BufferGeometry) {
-                resolve(geometry)
-            }, undefined, function (error: any) {
-                reject(error)
-            })
+    decodeDraco = (dracoURL: string, frameNo: number) => {
+        this.dracoLoader.load(dracoURL, (geometry: BufferGeometry) => {
+            this.meshMap.set(frameNo, geometry)
         })
     }
 
-    decodeKTX2 = (textureURL: string): Promise<CompressedArrayTexture> => {
-        return new Promise((resolve, reject) => {
-            this.ktx2Loader.load(textureURL, function (texture) {
-                resolve(texture);
-            }, undefined, function (error: any) {
-                reject(error)
-            })
+    decodeKTX2 = (textureURL: string, segmentNo: number) => {
+        this.ktx2Loader.load(textureURL, (texture: CompressedArrayTexture) => {
+            this.textureMap.set(segmentNo, texture)
         })
     }
 
     processFrame = () => {
+        this.audioTime = this.audio.currentTime;
         const nextThresholdFrame = Math.min(this.currentFrame + this.minFramesRequired, this.totalFrameCount - 1)
         const nextThresholdSegment = Math.min(this.currentSegment + this.minSegmentsRequired, this.totalSegmentCount - 1)
 
@@ -282,7 +277,6 @@ export default class Player {
         if (!canPlay) {
             this.onMeshBuffering(this.meshMap.size / this.minFramesRequired)
             if (!this.audio.paused) {
-                console.log('pausing', this.meshMap.size, this.textureMap.size)
                 this.audio.pause()
             }
             return;
@@ -290,57 +284,50 @@ export default class Player {
 
 
         if (this.audio.paused) {
-            console.log('playing', this.meshMap.size, this.textureMap.size)
             this.audio.play()
         }
-
-        this.audioTime = this.audio.currentTime;
+        if (this.currentFrame >= this.totalFrameCount) {
+            this.prepareNextLoop()
+            return;
+        }
         this.onFrameShow(this.currentFrame)
         const offSet = this.currentFrame % this.batchSize;
 
         this.onFrameShow?.(this.currentFrame);
-        this.mesh.geometry = this.meshMap.get(this.currentFrame)
-        this.mesh.geometry.attributes.position.needsUpdate = true;
         if (offSet == 0) {
             /* this video texture is a new segment, updating mesh's material with new segment's material */
-            if (!this.material) {
-                this.material = new ShaderMaterial({
-                    uniforms: {
-                        diffuse: {
-                            value: this.textureMap.get(this.currentSegment),
-                        },
-                        depth: {
-                            value: 0,
-                        },
-                    },
-                    vertexShader: this.vertexShader,
-                    fragmentShader: this.fragmentShader,
-                    glslVersion: GLSL3,
-                });
-                this.mesh.material = this.material
-            } else {
-                this.mesh.material = this.material.clone()
-                // this.material.dispose()
-                // @ts-ignore
-                this.mesh.material.uniforms = {
+
+            const material = new ShaderMaterial({
+                uniforms: {
                     diffuse: {
                         value: this.textureMap.get(this.currentSegment),
                     },
                     depth: {
                         value: 0,
                     },
-                }
-            }
-            (this.mesh.material as ShaderMaterial).needsUpdate = true;
-            console.log('material changed')
+                },
+                vertexShader: this.vertexShader,
+                fragmentShader: this.fragmentShader,
+                glslVersion: GLSL3,
+            });
+            material.needsUpdate = true;
+            //@ts-ignore
+            this.mesh.material.dispose()
+            this.mesh.material = material;
+
+            this.mesh.geometry = this.meshMap.get(this.currentFrame)
+            this.mesh.geometry.attributes.position.needsUpdate = true;
+
         } else {
+            this.mesh.geometry = this.meshMap.get(this.currentFrame)
+            this.mesh.geometry.attributes.position.needsUpdate = true;
             // updating texture within CompressedArrayTexture
             (this.mesh.material as ShaderMaterial).uniforms['depth'].value = offSet;
         }
     }
 
     removePlayedBuffer() {
-        const previousFrame = this.currentFrame - 1
+        const previousFrame = this.currentFrame - 5
         const previousSegment = this.currentSegment - 1
         if (previousFrame >= 0) {
             for (const [key, buffer] of this.meshMap.entries()) {
@@ -362,7 +349,7 @@ export default class Player {
     }
 
     update = () => {
-        this.fetchBuffers()
+        // this.fetchBuffers()
         this.processFrame()
         this.removePlayedBuffer()
     }

@@ -85,6 +85,7 @@ const VolumetricPlayer = (props: VolumetricPlayerProps) => {
     };
     if (!rendererRef.current) {
       rendererRef.current = new WebGLRenderer(renderConfig);
+      rendererRef.current.debug.checkShaderErrors = false;
     }
     let renderer = rendererRef.current;
     if (controls) {

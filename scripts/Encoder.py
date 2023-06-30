@@ -7,6 +7,7 @@ import os
 import subprocess
 import shlex
 from tqdm import tqdm
+import re
 
 
 import io
@@ -87,7 +88,7 @@ def main():
         frame_index = 0
         for file in progress_bar:
             progress_bar.set_description(f'📦 Compressing frame {frame_index}')
-            command = f'draco_encoder -i {os.path.join(config["OBJFilesPath"], file)} -o {os.path.join(config["OutputDirectory"], "DRC", file + ".drc")} -qp {config.get("Q_POSITION_ATTR", 11)} -qt {config.get("Q_TEXTURE_ATTR", 10)} -qn {config.get("Q_NORMAL_ATTR", 8)} -qg {config.get("Q_GENERIC_ATTR", 8)} -cl {config.get("DRACO_COMPRESSION_LEVEL", 7)}'
+            command = f'draco_encoder -i "{os.path.join(config["OBJFilesPath"], file)}" -o "{os.path.join(config["OutputDirectory"], "DRC", file + ".drc")}" -qp {config.get("Q_POSITION_ATTR", 11)} -qt {config.get("Q_TEXTURE_ATTR", 10)} -qn {config.get("Q_NORMAL_ATTR", 8)} -qg {config.get("Q_GENERIC_ATTR", 8)} -cl {config.get("DRACO_COMPRESSION_LEVEL", 7)}'
             args = shlex.split(command)
             subprocess.call(args, stdout=subprocess.DEVNULL)
             frame_index += 1

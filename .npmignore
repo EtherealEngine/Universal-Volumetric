@@ -1,6 +1,5 @@
-deprecated 
-android
+deprecated
+example
 src
-unity
 renovate.json
-web
+tsconfig.json
