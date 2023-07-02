@@ -4,7 +4,6 @@ import {
     MeshBasicMaterial,
     ShaderMaterial,
     PlaneGeometry,
-    SRGBColorSpace,
     CompressedArrayTexture,
     WebGLRenderer,
     GLSL3,
@@ -73,7 +72,7 @@ export default class Player {
     private lastRequestedGeometryFrame: number
     private lastRequestedTextureSegment: number
     private audio: HTMLAudioElement
-    private fileHeader: FileHeader
+    private fileHeader: FileHeader | null
     private vertexShader: string
     private fragmentShader: string
     private intervalId: NodeJS.Timer
@@ -165,7 +164,6 @@ export default class Player {
         this.dracoLoader.preload();
 
         this.audio = document.createElement('audio')
-        this.prepareNextLoop(0)
 
         this.vertexShader = `uniform vec2 size;
         out vec2 vUv;
@@ -192,6 +190,7 @@ export default class Player {
     }
 
     prepareNextLoop = (nextTrackId?: number) => {
+        this.fileHeader = null
         if (typeof nextTrackId === 'undefined') {
             if (this.playMode == PlayMode.random) {
                 nextTrackId = Math.floor(Math.random() * this.paths.length)
