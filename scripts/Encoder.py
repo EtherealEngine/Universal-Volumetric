@@ -67,7 +67,7 @@ def main():
             bpy.context.scene.frame_set(frame)
             # generate the output file path
             output_path = os.path.join(
-                config["OutputDirectory"], "OBJ", f"frame_{frame:04}.obj"
+                config["OutputDirectory"], "OBJ", f"frame_{frame:05}.obj"
             )
 
             progress_bar.set_description(f"🔍 Extracting frame {frame}")
@@ -76,33 +76,38 @@ def main():
                 # by silencing the output
                 bpy.ops.export_scene.obj(filepath=output_path, use_selection=True)
 
-        config["OBJFilesPath"] = os.path.join(config["OutputDirectory"], "OBJ")
+        config["OBJFilesPath"] = os.path.join(config["OutputDirectory"], "OBJ", "frame_#####.obj")
 
     if config.get("OBJFilesPath", None):
         print("🚧 Obtained OBJ files path")
-        obj_files = sorted([file for file in os.listdir(config["OBJFilesPath"]) if file.endswith('obj')])
 
+        directory, pattern = os.path.split(config["OBJFilesPath"])
+        obj_files = sorted([file for file in os.listdir(directory) if file.endswith('obj')])
         os.makedirs(os.path.join(config["OutputDirectory"], "DRC"), exist_ok=True)
+        config["DRACOFilesPath"] = os.path.join(config["OutputDirectory"], "DRC", pattern + '.drc')
 
         progress_bar = tqdm(obj_files)
         frame_index = 0
         for file in progress_bar:
             progress_bar.set_description(f'📦 Compressing frame {frame_index}')
-            command = f'draco_encoder -i "{os.path.join(config["OBJFilesPath"], file)}" -o "{os.path.join(config["OutputDirectory"], "DRC", file + ".drc")}" -qp {config.get("Q_POSITION_ATTR", 11)} -qt {config.get("Q_TEXTURE_ATTR", 10)} -qn {config.get("Q_NORMAL_ATTR", 8)} -qg {config.get("Q_GENERIC_ATTR", 8)} -cl {config.get("DRACO_COMPRESSION_LEVEL", 7)}'
+            command = f'draco_encoder -i "{os.path.join(directory, file)}" -o "{os.path.join(config["OutputDirectory"], "DRC", file + ".drc")}" -qp {config.get("Q_POSITION_ATTR", 11)} -qt {config.get("Q_TEXTURE_ATTR", 10)} -qn {config.get("Q_NORMAL_ATTR", 8)} -qg {config.get("Q_GENERIC_ATTR", 8)} -cl {config.get("DRACO_COMPRESSION_LEVEL", 7)}'
             args = shlex.split(command)
-            subprocess.call(args, stdout=subprocess.DEVNULL)
+            rc = subprocess.call(args, stdout=subprocess.DEVNULL)
+            if rc:
+                print(f'Failed to compress {file}')
+                exit(1)
             frame_index += 1
 
-        config["DRACOFilesPath"] = os.path.join(config["OutputDirectory"], "DRC")
+        
 
     if config.get("DRACOFilesPath", None):
         print("✅ Obtained DRACO files")
 
     print("🎯 Dealing with Texture data")
-    if config.get("IMAGES_PATH", None):
-        if "%" not in config["IMAGES_PATH"]:
+    if config.get("ImagesPath", None):
+        if "%" not in config["ImagesPath"]:
             print(
-                "❌ IMAGES_PATH must be printf() format string to compose multiple filenames"
+                "❌ ImagesPath must be printf() format string to compose multiple filenames"
             )
             exit(1)
         print("🚧 Obtained Images path.")
@@ -112,9 +117,13 @@ def main():
         progress_bar = tqdm(range(config["KTX2_FIRST_FILE"], config["KTX2_FILE_COUNT"], config["KTX2_BATCH_SIZE"]))
         for current_file_index in progress_bar:
             progress_bar.set_description(f'📦 Compressing images from {current_file_index} to {current_file_index + config["KTX2_BATCH_SIZE"] - 1}')
-            command = f'basisu -ktx2 -tex_type video -multifile_printf "{config["IMAGES_PATH"]}" -multifile_num {config["KTX2_BATCH_SIZE"]} -multifile_first {config["KTX2_FIRST_FILE"]} -y_flip -output_file "{os.path.join(config["OutputDirectory"], "KTX2", "texture_%05u"%(current_file_index//config["KTX2_BATCH_SIZE"]))}.ktx2"'
+            command = f'basisu -ktx2 -tex_type video -multifile_printf "{config["ImagesPath"]}" -multifile_num {config["KTX2_BATCH_SIZE"]} -multifile_first {config["KTX2_FIRST_FILE"]} -y_flip -output_file "{os.path.join(config["OutputDirectory"], "KTX2", "texture_%05u"%(current_file_index//config["KTX2_BATCH_SIZE"]))}.ktx2"'
             args = shlex.split(command)
-            subprocess.call(args, stdout=subprocess.DEVNULL)
+            rc = subprocess.call(args, stdout=subprocess.DEVNULL)
+            if rc:
+                print(f'Failed to compress images with indices: [{current_file_index}, {current_file_index + config["KTX2_BATCH_SIZE"]}]')
+                exit(1)
+
             
         config["KTX2FilesPath"] = os.path.join(config["OutputDirectory"], "KTX2")
 
@@ -125,7 +134,7 @@ def main():
         "DRCURLPattern": config["DRACOFilesPath"],
         "KTX2URLPattern": config["KTX2FilesPath"],
         "BatchSize": config["KTX2_BATCH_SIZE"],
-        "TotalFrames": len(os.listdir(config["DRACOFilesPath"])),
+        "TotalFrames": len(os.listdir(os.path.split(config["DRACOFilesPath"])[0])),
         "FrameRate": config["FRAME_RATE"],
     }
     if config.get("AudioURL", None):

@@ -8,6 +8,8 @@ import {
     CompressedArrayTexture,
     WebGLRenderer,
     GLSL3,
+    Clock,
+    Material,
 } from 'three'
 
 import { DRACOLoader } from '../lib/DRACOLoader';
@@ -23,6 +25,7 @@ export enum PlayMode {
 
 type onMeshBufferingCallback = (progress: number) => void
 type onFrameShowCallback = (frame: number) => void
+type fetchBuffersCallback = () => void
 
 export type PlayerConstructorArgs = {
     renderer: WebGLRenderer
@@ -45,21 +48,24 @@ export default class Player {
     // Public Fields
     public renderer: WebGLRenderer
     public playMode: PlayMode
-    public geometryBufferSize: number = 75
-    public textureBufferSize: number = 15
+    public geometryBufferSize: number = 100
+    public textureBufferSize: number = 20
     public minFramesRequired: number = 50 // If atleast these many frames aren't loaded, the video buffers.
     public minSegmentsRequired: number = 10 // If atleast these many segments aren't loaded, the video buffers.
+    public currentFrame: number
+
 
     // Three objects
     public paths: Array<string>
     public mesh: Mesh
     private ktx2Loader: KTX2Loader
     private dracoLoader: DRACOLoader
-    private material: ShaderMaterial | null = null
+    private failMaterial: Material | null = null
+    private clock: Clock | null
 
     // Private Fields
-    private audioTime: number = 0
-    private currentTrack: number = 0
+    private currentTime: number = 0
+    private currentTrackId: number = 0
     private meshMap: Map<number, BufferGeometry> = new Map()
     private textureMap: Map<number, CompressedArrayTexture> = new Map()
     private onMeshBuffering: onMeshBufferingCallback | null = null
@@ -70,6 +76,7 @@ export default class Player {
     private fileHeader: FileHeader
     private vertexShader: string
     private fragmentShader: string
+    private intervalId: NodeJS.Timer
 
     get totalFrameCount(): number {
         return this.fileHeader.TotalFrames
@@ -83,16 +90,31 @@ export default class Player {
         return Math.ceil(this.totalFrameCount / this.batchSize)
     }
 
-    get currentFrame(): number {
-        return Math.round(this.audioTime * this.fileHeader.FrameRate)
-    }
-
     get currentSegment(): number {
-        return Math.floor(this.currentFrame / this.batchSize)
+        if (this.fileHeader) {
+            return Math.floor(this.currentFrame / this.batchSize)
+        } else {
+            return 0
+        }
     }
 
     get currentTrackData() {
-        return this.paths[this.currentTrack]
+        return this.paths[this.currentTrackId]
+    }
+
+    get paused(): boolean {
+        if (!this.fileHeader) {
+            return true
+        }
+        if (this.fileHeader.AudioURL) {
+            return this.audio.paused
+        } else {
+            return !this.clock.running
+        }
+    }
+
+    setCurrentFrame() {
+        this.currentFrame = Math.round(this.currentTime * this.fileHeader.FrameRate)
     }
 
 
@@ -143,10 +165,7 @@ export default class Player {
         this.dracoLoader.preload();
 
         this.audio = document.createElement('audio')
-        this.prepareNextLoop()
-        setInterval(() => {
-            this.fetchBuffers();
-        }, 500);
+        this.prepareNextLoop(0)
 
         this.vertexShader = `uniform vec2 size;
         out vec2 vUv;
@@ -168,35 +187,57 @@ export default class Player {
             vec4 color = texture2D( diffuse, vec3( vUv, depth ) );
             outColor = LinearTosRGB(color);
         }`
+
+        this.failMaterial = new MeshBasicMaterial({ color: 0xffffff })
     }
 
-    prepareNextLoop = () => {
-        let nextTrack = -1;
-        if (this.playMode == PlayMode.random) {
-            nextTrack = Math.floor(Math.random() * this.paths.length)
-        } else if (this.playMode == PlayMode.single) {
-            nextTrack = (this.currentTrack + 1) % this.paths.length
-        } else if (this.playMode == PlayMode.singleloop) {
-            nextTrack = this.currentTrack
-        } else {
-            nextTrack = (this.currentTrack + 1) % this.paths.length
+    prepareNextLoop = (nextTrackId?: number) => {
+        if (typeof nextTrackId === 'undefined') {
+            if (this.playMode == PlayMode.random) {
+                nextTrackId = Math.floor(Math.random() * this.paths.length)
+            } else if (this.playMode == PlayMode.single) {
+                nextTrackId = (this.currentTrackId + 1) % this.paths.length
+            } else if (this.playMode == PlayMode.singleloop) {
+                nextTrackId = this.currentTrackId
+            } else {
+                // PlayMode.loop
+                nextTrackId = (this.currentTrackId + 1) % this.paths.length
+            }
         }
-        this.dispose();
-        this.currentTrack = nextTrack
-        this.audioTime = 0;
+        clearInterval(this.intervalId)
+        this.currentTrackId = nextTrackId
+        this.currentTime = 0;
         this.lastRequestedGeometryFrame = this.lastRequestedTextureSegment = -1
-        const manifestFilePath = this.paths[this.currentTrack].replace('uvol', 'manifest')
+        const manifestFilePath = this.paths[this.currentTrackId].replace('uvol', 'manifest')
 
-        const xhr = new XMLHttpRequest()
-        xhr.onreadystatechange = () => {
-            if (xhr.readyState !== 4) return
-            this.fileHeader = JSON.parse(xhr.responseText)
+        fetch(manifestFilePath).then(response => response.json()).then(json => {
+            this.fileHeader = json;
+            console.log('got the manifest file: ', this.fileHeader)
+            if (this.fileHeader.AudioURL) {
+                this.audio.src = this.fileHeader.AudioURL
+                this.audio.currentTime = 0
+                this.clock = null
+            } else {
+                // Managing time with THREE.Clock, since this video doesn't have audio
+                this.clock = new Clock()
+            }
+
+            this.dispose();
+            this.currentFrame = 0
+            this.fetchBuffers(this.startVideo); /** Start video once it fetches enough buffers */
+        })
+    }
+
+    startVideo = () => {
+        if (this.fileHeader.AudioURL) {
+            this.audio.play()
+        } else {
+            this.clock.start()
         }
-        xhr.open('GET', manifestFilePath, false) // false for synchronous
-        xhr.send()
-        this.audio.src = this.fileHeader.AudioURL
-        this.audio.currentTime = 0
-        console.info('Playing new track: ', this.currentTrack)
+        console.info(`Playing new track: ${this.currentTrackId}, MeshMap.Size: ${this.meshMap.size}, TextureMap.Size: ${this.textureMap.size}`)
+        this.intervalId = setInterval(() => {
+            this.fetchBuffers();
+        }, 100);
     }
 
     /**
@@ -225,14 +266,16 @@ export default class Player {
      * If meshMap has less than required meshes, we keep fetching meshes. Otherwise, we keep fetching meshes.
      * Same goes for textures.
      */
-    fetchBuffers = () => {
+    fetchBuffers = (callback?: fetchBuffersCallback) => {
+        const promises = []
+
         if ((this.lastRequestedGeometryFrame - this.currentFrame) < this.geometryBufferSize && this.lastRequestedGeometryFrame != (this.totalFrameCount - 1)) {
             let currentRequestingFrame = this.lastRequestedGeometryFrame + 1;
             this.lastRequestedGeometryFrame = Math.min(this.currentFrame + this.geometryBufferSize, this.totalFrameCount - 1);
             for (; currentRequestingFrame <= this.lastRequestedGeometryFrame; currentRequestingFrame++) {
                 const padWidth = this.countHashChar(this.fileHeader.DRCURLPattern);
                 const dracoURL = this.fileHeader.DRCURLPattern.replace('#'.repeat(padWidth), this.pad(currentRequestingFrame, padWidth));
-                this.decodeDraco(dracoURL, currentRequestingFrame);
+                promises.push(this.decodeDraco(dracoURL, currentRequestingFrame));
             }
         }
         if ((this.lastRequestedTextureSegment - this.currentSegment) < this.textureBufferSize && this.lastRequestedTextureSegment != (this.totalSegmentCount - 1)) {
@@ -241,62 +284,87 @@ export default class Player {
             for (; currentRequestingTextureSegment <= this.lastRequestedTextureSegment; currentRequestingTextureSegment++) {
                 const padWidth = this.countHashChar(this.fileHeader.KTX2URLPattern);
                 const textureURL = this.fileHeader.KTX2URLPattern.replace('#'.repeat(padWidth), this.pad(currentRequestingTextureSegment, padWidth));
-                this.decodeKTX2(textureURL, currentRequestingTextureSegment);
+                promises.push(this.decodeKTX2(textureURL, currentRequestingTextureSegment));
             }
         }
-        if (this.audio.ended || (this.currentFrame + 1) >= this.totalFrameCount) {
-            this.prepareNextLoop();
-        }        
+
+        if (callback) {
+            Promise.all(promises).then(() => {
+                callback()
+            })
+        }
     }
 
     decodeDraco = (dracoURL: string, frameNo: number) => {
-        this.dracoLoader.load(dracoURL, (geometry: BufferGeometry) => {
-            this.meshMap.set(frameNo, geometry)
+        return new Promise((resolve, reject) => {
+            this.dracoLoader.load(dracoURL, (geometry: BufferGeometry) => {
+                this.meshMap.set(frameNo, geometry)
+                resolve(true) // we only care about when this is resolved, to call callback()
+            })
         })
     }
 
     decodeKTX2 = (textureURL: string, segmentNo: number) => {
-        this.ktx2Loader.load(textureURL, (texture: CompressedArrayTexture) => {
-            this.textureMap.set(segmentNo, texture)
+        return new Promise((resolve, reject) => {
+            this.ktx2Loader.load(textureURL, (texture: CompressedArrayTexture) => {
+                this.textureMap.set(segmentNo, texture)
+                resolve(true) // we only care about when this is resolved, to call callback()
+            })
         })
     }
 
     processFrame = () => {
-        this.audioTime = this.audio.currentTime;
-        const nextThresholdFrame = Math.min(this.currentFrame + this.minFramesRequired, this.totalFrameCount - 1)
-        const nextThresholdSegment = Math.min(this.currentSegment + this.minSegmentsRequired, this.totalSegmentCount - 1)
-
-
-        const canPlay = (
-            this.meshMap.has(this.currentFrame) &&
-            this.meshMap.has(nextThresholdFrame) &&
-            this.textureMap.has(this.currentSegment) &&
-            this.textureMap.has(nextThresholdSegment)
-        )
-
-        if (!canPlay) {
-            this.onMeshBuffering(this.meshMap.size / this.minFramesRequired)
-            if (!this.audio.paused) {
-                this.audio.pause()
-            }
+        if (this.paused) {
+            /**
+             * Usually, this case arises when new track is set and fetchBuffers is still loading next frames.
+             * Until, startVideo is called, this.paused stays true.
+             */
+            this.onMeshBuffering(this.meshMap.size / this.geometryBufferSize)
             return;
         }
 
 
-        if (this.audio.paused) {
-            this.audio.play()
+        if (this.fileHeader.AudioURL) {
+            this.currentTime = this.audio.currentTime;
+        } else {
+            this.currentTime += this.clock.getDelta()
         }
+
+        this.setCurrentFrame();
+
         if (this.currentFrame >= this.totalFrameCount) {
             this.prepareNextLoop()
             return;
         }
+
+        /**
+         * We prioritize geometry frames over texture frames.
+         * If we have geometry frames but not texture frames, a default failMaterial is applied to that.
+         */
+
+        if (!this.meshMap.has(this.currentFrame)) {
+            return;
+        }
+
+        if (!this.textureMap.has(this.currentSegment)) {
+            this.mesh.geometry = this.meshMap.get(this.currentFrame)
+            this.mesh.material = this.failMaterial
+            this.onFrameShow?.(this.currentFrame);
+            return;
+        }
+
         this.onFrameShow(this.currentFrame)
         const offSet = this.currentFrame % this.batchSize;
 
         this.onFrameShow?.(this.currentFrame);
-        if (offSet == 0) {
-            /* this video texture is a new segment, updating mesh's material with new segment's material */
 
+        // @ts-ignore
+        if (offSet == 0 || !this.mesh.material.isShaderMaterial) {
+            /**
+             * Either this is a new segment, hence we need to apply a new texture
+             * Or In the previous frame, we applied to failMaterial, so that current mesh.material is not a ShaderMaterial.
+             * In both cases, we need to apply texture since we know we have one.
+             */
             const material = new ShaderMaterial({
                 uniforms: {
                     diffuse: {
@@ -316,34 +384,32 @@ export default class Player {
             this.mesh.material = material;
 
             this.mesh.geometry = this.meshMap.get(this.currentFrame)
-            this.mesh.geometry.attributes.position.needsUpdate = true;
+            if (this.mesh.geometry) {
+                this.mesh.geometry.attributes.position.needsUpdate = true;
+            }
 
         } else {
             this.mesh.geometry = this.meshMap.get(this.currentFrame)
-            this.mesh.geometry.attributes.position.needsUpdate = true;
+            if (this.mesh.geometry) {
+                this.mesh.geometry.attributes.position.needsUpdate = true;
+            }
             // updating texture within CompressedArrayTexture
             (this.mesh.material as ShaderMaterial).uniforms['depth'].value = offSet;
         }
     }
 
-    removePlayedBuffer() {
-        const previousFrame = this.currentFrame - 5
-        const previousSegment = this.currentSegment - 1
-        if (previousFrame >= 0) {
-            for (const [key, buffer] of this.meshMap.entries()) {
-                if (key < previousFrame) {
-                    buffer.dispose()
-                    this.meshMap.delete(key)
-                }
+    removePlayedBuffer(frameNo, segmentNo) {
+        for (const [key, buffer] of this.meshMap.entries()) {
+            if (key < frameNo) {
+                buffer.dispose()
+                this.meshMap.delete(key)
             }
         }
 
-        if (previousSegment >= 0) {
-            for (const [key, buffer] of this.textureMap.entries()) {
-                if (key < previousSegment) {
-                    buffer.dispose()
-                    this.textureMap.delete(key)
-                }
+        for (const [key, buffer] of this.textureMap.entries()) {
+            if (key < segmentNo) {
+                buffer.dispose()
+                this.textureMap.delete(key)
             }
         }
     }
@@ -351,7 +417,7 @@ export default class Player {
     update = () => {
         // this.fetchBuffers()
         this.processFrame()
-        this.removePlayedBuffer()
+        this.removePlayedBuffer(this.currentFrame - 5, this.currentSegment - 1)
     }
 
     dispose(): void {

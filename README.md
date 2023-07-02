@@ -21,7 +21,7 @@ User have to input a `config.json` file to the Encoder script. This config file 
     Q_NORMAL_ATTR: number,
     Q_GENERIC_ATTR: number,
     DRACO_COMPRESSION_LEVEL: number,
-    IMAGES_PATH: string,
+    ImagesPath: string,
     KTX2_FIRST_FILE: number,
     KTX2_FILE_COUNT: number,
     KTX2_BATCH_SIZE: number,
