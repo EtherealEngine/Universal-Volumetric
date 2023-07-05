@@ -39,8 +39,10 @@ export type FileHeader = {
     KTX2URLPattern: string
     AudioURL: string
     BatchSize: number
-    TotalFrames: number
-    FrameRate: number
+    GeometryFrameCount: number
+    TextureSegmentCount: number
+    GeometryFrameRate: number
+    TextureFrameRate: number
 }
 
 export default class Player {
@@ -51,7 +53,8 @@ export default class Player {
     public textureBufferSize: number = 20
     public minFramesRequired: number = 50 // If atleast these many frames aren't loaded, the video buffers.
     public minSegmentsRequired: number = 10 // If atleast these many segments aren't loaded, the video buffers.
-    public currentFrame: number
+    public currentGeometryFrame: number
+    public currentTextureFrame: number
 
 
     // Three objects
@@ -77,45 +80,21 @@ export default class Player {
     private fragmentShader: string
     private intervalId: NodeJS.Timer
 
-    get totalFrameCount(): number {
-        return this.fileHeader.TotalFrames
-    }
-
-    get batchSize(): number {
-        return this.fileHeader.BatchSize
-    }
-
-    get totalSegmentCount(): number {
-        return Math.ceil(this.totalFrameCount / this.batchSize)
-    }
-
-    get currentSegment(): number {
+    get currentTextureSegment(): number {
         if (this.fileHeader) {
-            return Math.floor(this.currentFrame / this.batchSize)
+            return Math.floor(this.currentTextureFrame / this.fileHeader.BatchSize)
         } else {
             return 0
         }
     }
 
-    get currentTrackData() {
-        return this.paths[this.currentTrackId]
-    }
-
     get paused(): boolean {
-        if (!this.fileHeader) {
-            return true
-        }
         if (this.fileHeader.AudioURL) {
             return this.audio.paused
         } else {
             return !this.clock.running
         }
     }
-
-    setCurrentFrame() {
-        this.currentFrame = Math.round(this.currentTime * this.fileHeader.FrameRate)
-    }
-
 
     constructor({
         renderer,
@@ -211,7 +190,14 @@ export default class Player {
 
         fetch(manifestFilePath).then(response => response.json()).then(json => {
             this.fileHeader = json;
-            console.log('got the manifest file: ', this.fileHeader)
+
+            // Always make sure, we have 5 seconds of buffer.
+            this.geometryBufferSize = 5 * this.fileHeader.GeometryFrameRate;
+
+            // segments instead of frames
+            this.textureBufferSize = Math.ceil((2 * this.fileHeader.TextureFrameRate) / this.fileHeader.BatchSize)
+
+            console.log('reeeived manifest file: ', this.fileHeader)
             if (this.fileHeader.AudioURL) {
                 this.audio.src = this.fileHeader.AudioURL
                 this.audio.currentTime = 0
@@ -222,7 +208,8 @@ export default class Player {
             }
 
             this.dispose();
-            this.currentFrame = 0
+            this.currentGeometryFrame = 0
+            this.currentTextureFrame = 0
             this.fetchBuffers(this.startVideo); /** Start video once it fetches enough buffers */
         })
     }
@@ -268,18 +255,18 @@ export default class Player {
     fetchBuffers = (callback?: fetchBuffersCallback) => {
         const promises = []
 
-        if ((this.lastRequestedGeometryFrame - this.currentFrame) < this.geometryBufferSize && this.lastRequestedGeometryFrame != (this.totalFrameCount - 1)) {
+        if ((this.lastRequestedGeometryFrame - this.currentGeometryFrame) < this.geometryBufferSize && this.lastRequestedGeometryFrame != (this.fileHeader.GeometryFrameCount - 1)) {
             let currentRequestingFrame = this.lastRequestedGeometryFrame + 1;
-            this.lastRequestedGeometryFrame = Math.min(this.currentFrame + this.geometryBufferSize, this.totalFrameCount - 1);
+            this.lastRequestedGeometryFrame = Math.min(this.currentGeometryFrame + this.geometryBufferSize, this.fileHeader.GeometryFrameCount - 1);
             for (; currentRequestingFrame <= this.lastRequestedGeometryFrame; currentRequestingFrame++) {
                 const padWidth = this.countHashChar(this.fileHeader.DRCURLPattern);
                 const dracoURL = this.fileHeader.DRCURLPattern.replace('#'.repeat(padWidth), this.pad(currentRequestingFrame, padWidth));
                 promises.push(this.decodeDraco(dracoURL, currentRequestingFrame));
             }
         }
-        if ((this.lastRequestedTextureSegment - this.currentSegment) < this.textureBufferSize && this.lastRequestedTextureSegment != (this.totalSegmentCount - 1)) {
+        if ((this.lastRequestedTextureSegment - this.currentTextureSegment) < this.textureBufferSize && this.lastRequestedTextureSegment != (this.fileHeader.TextureSegmentCount - 1)) {
             let currentRequestingTextureSegment = this.lastRequestedTextureSegment + 1;
-            this.lastRequestedTextureSegment = Math.min(this.currentSegment + this.textureBufferSize, this.totalSegmentCount - 1);
+            this.lastRequestedTextureSegment = Math.min(this.currentTextureSegment + this.textureBufferSize, this.fileHeader.TextureSegmentCount - 1);
             for (; currentRequestingTextureSegment <= this.lastRequestedTextureSegment; currentRequestingTextureSegment++) {
                 const padWidth = this.countHashChar(this.fileHeader.KTX2URLPattern);
                 const textureURL = this.fileHeader.KTX2URLPattern.replace('#'.repeat(padWidth), this.pad(currentRequestingTextureSegment, padWidth));
@@ -313,6 +300,10 @@ export default class Player {
     }
 
     processFrame = () => {
+        if (!this.fileHeader) {
+            return;
+        }
+
         if (this.paused) {
             /**
              * Usually, this case arises when new track is set and fetchBuffers is still loading next frames.
@@ -329,45 +320,51 @@ export default class Player {
             this.currentTime += this.clock.getDelta()
         }
 
-        this.setCurrentFrame();
+        this.currentGeometryFrame = Math.round(this.currentTime * this.fileHeader.GeometryFrameRate)
 
-        if (this.currentFrame >= this.totalFrameCount) {
+        // Need thoughts on this. We can also calculate texture frame from the geometry frame, and change it twice
+        // this.currentTextureFrame = Math.round((this.currentGeometryFrame * this.fileHeader.TextureFrameRate) / (this.fileHeader.GeometryFrameRate))
+        this.currentTextureFrame = Math.round(this.currentTime * this.fileHeader.TextureFrameRate)
+
+        if (this.currentGeometryFrame >= this.fileHeader.GeometryFrameCount) {
             this.prepareNextLoop()
             return;
         }
 
         /**
          * We prioritize geometry frames over texture frames.
-         * If we have geometry frames but not texture frames, a default failMaterial is applied to that.
+         * If meshMap does not have the geometry frame, simply skip it
+         * If meshMap has geometry frame but not the texture segment, a default failMaterial is applied to that mesh.
          */
 
-        if (!this.meshMap.has(this.currentFrame)) {
+        if (!this.meshMap.has(this.currentGeometryFrame)) {
             return;
         }
 
-        if (!this.textureMap.has(this.currentSegment)) {
-            this.mesh.geometry = this.meshMap.get(this.currentFrame)
+        if (!this.textureMap.has(this.currentTextureSegment)) {
+            this.mesh.geometry = this.meshMap.get(this.currentGeometryFrame)
             this.mesh.material = this.failMaterial
-            this.onFrameShow?.(this.currentFrame);
+            this.onFrameShow?.(this.currentGeometryFrame);
             return;
         }
 
-        this.onFrameShow(this.currentFrame)
-        const offSet = this.currentFrame % this.batchSize;
+        this.onFrameShow(this.currentGeometryFrame)
+        const offSet = this.currentTextureFrame % this.fileHeader.BatchSize;
 
-        this.onFrameShow?.(this.currentFrame);
+        this.onFrameShow?.(this.currentGeometryFrame);
 
         // @ts-ignore
-        if (offSet == 0 || !this.mesh.material.isShaderMaterial) {
+        if (offSet == 0 || !this.mesh.material.isShaderMaterial || (this.mesh.material.name != this.currentTextureSegment)) {
             /**
              * Either this is a new segment, hence we need to apply a new texture
              * Or In the previous frame, we applied to failMaterial, so that current mesh.material is not a ShaderMaterial.
-             * In both cases, we need to apply texture since we know we have one.
+             * Or Player skipped current segment's first frame hence it has old segment's ShaderMaterial
+             * In all the above cases, we need to apply new texture since we know we have one.
              */
             const material = new ShaderMaterial({
                 uniforms: {
                     diffuse: {
-                        value: this.textureMap.get(this.currentSegment),
+                        value: this.textureMap.get(this.currentTextureSegment),
                     },
                     depth: {
                         value: 0,
@@ -377,18 +374,19 @@ export default class Player {
                 fragmentShader: this.fragmentShader,
                 glslVersion: GLSL3,
             });
+            material.name = this.currentTextureSegment.toString();
             material.needsUpdate = true;
             //@ts-ignore
             this.mesh.material.dispose()
             this.mesh.material = material;
 
-            this.mesh.geometry = this.meshMap.get(this.currentFrame)
+            this.mesh.geometry = this.meshMap.get(this.currentGeometryFrame)
             if (this.mesh.geometry) {
                 this.mesh.geometry.attributes.position.needsUpdate = true;
             }
 
         } else {
-            this.mesh.geometry = this.meshMap.get(this.currentFrame)
+            this.mesh.geometry = this.meshMap.get(this.currentGeometryFrame)
             if (this.mesh.geometry) {
                 this.mesh.geometry.attributes.position.needsUpdate = true;
             }
@@ -414,9 +412,11 @@ export default class Player {
     }
 
     update = () => {
-        // this.fetchBuffers()
+        if (!this.fileHeader) {
+            return;
+        }
         this.processFrame()
-        this.removePlayedBuffer(this.currentFrame - 5, this.currentSegment - 1)
+        this.removePlayedBuffer(this.currentGeometryFrame - 5, this.currentTextureSegment - 1)
     }
 
     dispose(): void {

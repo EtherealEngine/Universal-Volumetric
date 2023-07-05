@@ -26,7 +26,8 @@ User have to input a `config.json` file to the Encoder script. This config file 
     KTX2_FILE_COUNT: number,
     KTX2_BATCH_SIZE: number,
     KTX2FilesPath: string,
-    FRAME_RATE: number,
+    GEOMETRY_FRAME_RATE: number,
+    TEXTURE_FRAME_RATE: number,
     AudioURL: string,
     OutputDirectory: string
 }
@@ -37,13 +38,23 @@ Above is the type spec for the config file. It is not required to specify all th
 Let's start with mandatory fields.
 
 - **`name`**: This represents the name of the manifest file (or) basically to denote a particular Volumetric video.
-- **`FRAME_RATE`**: As the name suggests, this represents the frame rate of the volumetric video.
+- **`GEOMETRY_FRAME_RATE`**: This represents how many geometry frames are rendered per second.
+- **`TEXTURE_FRAME_RATE`**: This represents how many texture frames are rendered per second. _It is advisable to have both frame rates factors of one another. It helps the player to avoid ambiguities in calculating frame numbers._
 - **`KTX2_BATCH_SIZE`**: This represents number of frames are packed (or to be packed) in a single KTX2 video texture.
 - **`OutputDirectory`**: The processed files are stored in this directory (labelled with their formats).
 
 Now, we discuss about how geometry data is processed: ![](https://i.imgur.com/HC0xuOO.png)
 
 Followed by texture data processing: ![](https://i.imgur.com/xQs4uQR.png)
+
+Below paths must have the file pattern mentioned.
+
+- OBJFilesPath: Eg: `/home/3D/export_#####.obj`
+- DRACOFilesPath: Eg: `/home/3D/export_#####.drc`
+- ImagesPath: Eg: `/home/3D/export_#####.jpg`
+- KTX2FilesPath: Eg: `/home/3D/export_#####.ktx2`
+
+Frame numbers are calculated from the file names itself, Hence file names should be indexed (with padding). The manifest file also uses this notation in specifying `DRCURLPattern` and `KTX2URLPattern`. The indexing can be either 0 based indexing or 1 based indexing, but make sure it is consistent between Geometry files and Texture files. These indices are vital for the player to calculate right frame and render it with the right geometry/texture.
 
 ### Demo
 
