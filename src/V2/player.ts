@@ -63,6 +63,7 @@ export default class Player {
     private ktx2Loader: KTX2Loader
     private dracoLoader: DRACOLoader
     private failMaterial: Material | null = null
+    private shaderMaterial: ShaderMaterial // to reuse this material
     private clock: Clock | null
 
     // Private Fields
@@ -195,9 +196,9 @@ export default class Player {
             this.geometryBufferSize = 5 * this.fileHeader.GeometryFrameRate;
 
             // segments instead of frames
-            this.textureBufferSize = Math.ceil((2 * this.fileHeader.TextureFrameRate) / this.fileHeader.BatchSize)
+            this.textureBufferSize = Math.ceil((5 * this.fileHeader.TextureFrameRate) / this.fileHeader.BatchSize)
 
-            console.log('reeeived manifest file: ', this.fileHeader)
+            console.log('received manifest file: ', this.fileHeader)
             if (this.fileHeader.AudioURL) {
                 this.audio.src = this.fileHeader.AudioURL
                 this.audio.currentTime = 0
@@ -361,29 +362,43 @@ export default class Player {
              * Or Player skipped current segment's first frame hence it has old segment's ShaderMaterial
              * In all the above cases, we need to apply new texture since we know we have one.
              */
-            const material = new ShaderMaterial({
-                uniforms: {
-                    diffuse: {
-                        value: this.textureMap.get(this.currentTextureSegment),
-                    },
-                    depth: {
-                        value: 0,
-                    },
-                },
-                vertexShader: this.vertexShader,
-                fragmentShader: this.fragmentShader,
-                glslVersion: GLSL3,
-            });
-            material.name = this.currentTextureSegment.toString();
-            material.needsUpdate = true;
-            //@ts-ignore
-            this.mesh.material.dispose()
-            this.mesh.material = material;
 
-            this.mesh.geometry = this.meshMap.get(this.currentGeometryFrame)
-            if (this.mesh.geometry) {
-                this.mesh.geometry.attributes.position.needsUpdate = true;
+            if ((this.mesh.material as ShaderMaterial).isShaderMaterial) {
+                // If we already have ShaderMaterial, just update uniforms
+                (this.mesh.material as ShaderMaterial).uniforms.diffuse.value = this.textureMap.get(this.currentTextureSegment);
+                (this.mesh.material as ShaderMaterial).uniforms.depth.value = offSet
+            } else if (this.shaderMaterial) {
+                /**
+                 * Mesh doesn't have ShaderMaterial (probably it used failMaterial before)
+                 * But we have cached shaderMaterial, update uniforms and use it.
+                 */
+                this.shaderMaterial.uniforms.diffuse.value = this.textureMap.get(this.currentTextureSegment)
+                this.shaderMaterial.uniforms.depth.value = offSet
+                this.mesh.material = this.shaderMaterial
+            } else {
+                // We have nothing. Create material, Cache it and assign it.
+                this.shaderMaterial = new ShaderMaterial({
+                    uniforms: {
+                        diffuse: {
+                            value: this.textureMap.get(this.currentTextureSegment),
+                        },
+                        depth: {
+                            value: offSet,
+                        },
+                    },
+                    vertexShader: this.vertexShader,
+                    fragmentShader: this.fragmentShader,
+                    glslVersion: GLSL3,
+                });
+                this.mesh.material = this.shaderMaterial
             }
+
+            // @ts-ignore
+            this.mesh.material.name = this.currentTextureSegment.toString();
+            // @ts-ignore
+            this.mesh.material.needsUpdate = true;
+            this.mesh.geometry = this.meshMap.get(this.currentGeometryFrame)
+            this.mesh.geometry.attributes.position.needsUpdate = true;
 
         } else {
             this.mesh.geometry = this.meshMap.get(this.currentGeometryFrame)
@@ -438,6 +453,9 @@ export default class Player {
                 }
             }
             this.textureMap.clear()
+        }
+        if (this.shaderMaterial) {
+            this.shaderMaterial.dispose()
         }
     }
 }
