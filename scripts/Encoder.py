@@ -16,8 +16,8 @@ import audioread
 
 def convert_pounds_to_c_style(s):
     # export_#####.png => export_%05u.png
-    pound_count = s.count('#')
-    return s.replace('#' * pound_count, f'%0{pound_count}u')
+    pound_count = s.count("#")
+    return s.replace("#" * pound_count, f"%0{pound_count}u")
 
 
 def check_executables():
@@ -125,35 +125,63 @@ def check_total_frames(config):
     print(f"Geometry frame count: {geometry_frame_count}")
     print(f"Texture frame count (not segments): {texture_frame_count}")
 
-
     if (geometry_frame_count * config["TEXTURE_FRAME_RATE"]) != (
         texture_frame_count * config["GEOMETRY_FRAME_RATE"]
     ):
         print(
             "❌ Number of Geometry frames and Texture frames are not compatible with the given frame rates"
         )
-        print('Ignore and proceed? (y/n): ', end='')
+        print("Ignore and proceed? (y/n): ", end="")
         choice = input()
-        if choice == 'y':
+        if choice == "y":
             pass
         else:
             exit(1)
 
-
     uvol_durations = {
-        'geometry': geometry_frame_count / config["GEOMETRY_FRAME_RATE"],
-        'texture': texture_frame_count / config["TEXTURE_FRAME_RATE"]
+        "geometry": geometry_frame_count / config["GEOMETRY_FRAME_RATE"],
+        "texture": texture_frame_count / config["TEXTURE_FRAME_RATE"],
     }
     return uvol_durations, geometry_frame_count, len(texture_segments)
 
 
 def main():
-    check_executables()
-
     if len(sys.argv) != 2:
         print(
             "❌ Invalid number of arguments. Please supply project-config.json as argument"
         )
+
+    if sys.argv[1] == "create-template":
+        template_data_str = """{
+  "name": "",
+  "ABCFilePath": "",
+  "OBJFilesPath": "", // pattern with hashes. eg: OBJ/frame_###.obj
+  "DRACOFilesPath": "", // pattern with hashes
+  "Q_POSITION_ATTR": 11, // quantization bits for the position attribute, default=11.
+  "Q_TEXTURE_ATTR": 10, // quantization bits for the texture coordinate attribute, default=10.
+  "Q_NORMAL_ATTR": 8, // quantization bits for the normal vector attribute, default=8.
+  "Q_GENERIC_ATTR": 8, // quantization bits for any generic attribute, default=8.
+  "DRACO_COMPRESSION_LEVEL": 7, // compression level [0-10], most=10, least=0, default=7.
+  "ImagesPath": "", // pattern with hashes.
+  "KTX2_FIRST_FILE": 0, // The index of the first file in above pattern. Eg: If PNG/frame_001.png is first texture, this field should be 1
+  "KTX2_FILE_COUNT": 0,
+  "KTX2_BATCH_SIZE": 7,
+  "KTX2FilesPath": "",
+  "GEOMETRY_FRAME_RATE": 30,
+  "TEXTURE_FRAME_RATE": 30,
+  "OutputDirectory": ""
+}
+"""
+        with open("project-config-template.json", "w") as f:
+            print(template_data_str, file=f)
+        print("✅ Written template object to project-config-template.json")
+        print(
+            "The config file contains comments indicating extra info about fields. Encoder removes comments while parsing it, so you can leave them or add new comments"
+        )
+        return
+
+    check_executables()
+
     with open(sys.argv[1]) as f:
         config = json.load(f)
 
@@ -223,7 +251,7 @@ def main():
             rc = subprocess.call(args, stdout=subprocess.DEVNULL)
             if rc:
                 print(f"Failed to compress {file}")
-                print('Command: ', command)
+                print("Command: ", command)
                 exit(1)
             frame_index += 1
 
@@ -232,7 +260,7 @@ def main():
 
     print("🎯 Dealing with Texture data")
     if config.get("ImagesPath", None):
-        config['ImagesPath'] = convert_pounds_to_c_style(config['ImagesPath'])
+        config["ImagesPath"] = convert_pounds_to_c_style(config["ImagesPath"])
         print("🚧 Obtained Images path.")
         current_file_index = config["KTX2_FIRST_FILE"]
         os.makedirs(os.path.join(config["OutputDirectory"], "KTX2"), exist_ok=True)
@@ -255,7 +283,7 @@ def main():
                 print(
                     f'Failed to compress images with indices: [{current_file_index}, {current_file_index + config["KTX2_BATCH_SIZE"]}]'
                 )
-                print('Command: ', command)
+                print("Command: ", command)
                 exit(1)
 
         config["KTX2FilesPath"] = os.path.join(config["OutputDirectory"], "KTX2")
@@ -263,7 +291,9 @@ def main():
     if config["KTX2FilesPath"]:
         print("✅ Obtained KTX2 files")
 
-    uvol_durations, geometry_frame_count, texture_segment_count = check_total_frames(config)
+    uvol_durations, geometry_frame_count, texture_segment_count = check_total_frames(
+        config
+    )
     print("✅ Frames and frame rates are compatible")
 
     manifestData = {
@@ -284,15 +314,18 @@ def main():
     if config.get("AudioURL", None):
         with audioread.audio_open(config["AudioURL"]) as f:
             audio_duration = f.duration  # in seconds
-        if uvol_durations['geometry'] == audio_duration and uvol_durations['texture'] == audio_duration:
+        if (
+            uvol_durations["geometry"] == audio_duration
+            and uvol_durations["texture"] == audio_duration
+        ):
             print("✅ Audio duration matches with the frame count and frame rates")
         else:
             print("❌ Audio duration doesn't match with the frame count and frame rates")
             print(f"UVOL durations (without audio): ", uvol_durations)
             print(f"Audio duration: {audio_duration}")
-            print('Ignore and proceed? (y/n): ', end='')
+            print("Ignore and proceed? (y/n): ", end="")
             choice = input()
-            if choice == 'y':
+            if choice == "y":
                 pass
             else:
                 exit(1)
@@ -314,6 +347,13 @@ def main():
     print(
         f"💡 Tip: If you're moving the manifest file, move the DRACO and KTX2 directories along with it, because, they're relative paths"
     )
+
+    if ((config["GEOMETRY_FRAME_RATE"] % config["TEXTURE_FRAME_RATE"]) != 0) and (
+        (config["TEXTURE_FRAME_RATE"] % config["GEOMETRY_FRAME_RATE"]) != 0
+    ):
+        print(
+            "⚠️ Warning: Frame rates are not factors of one another. Ambiguities may arise when calulating appropriate texture for geometry frames."
+        )
 
 
 if __name__ == "__main__":
