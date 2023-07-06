@@ -6,7 +6,7 @@ The open source Universal Volumetric compressed interchange format for streaming
 
 UVOL 2.0 introduces usage of Compressed Array Textures, via KTX2 supercompressed textures, allowing volumetric media to use much less texture memory than UVOL 1.0!
 
-The geometry compression method has also been updated from Corto to Draco. UVOL2 uses directories of files which represent individual frames or frame sequneces, and a manifest file which points to these files. The Encoder helps you to convert the data you have to the data the UVOL player needs. The encoder script is located at: [`scripts/Encoder.py`](scripts/Encoder.py).
+The geometry compression method has also been updated from Corto to Draco. UVOL 2.0 uses directories of files which represent individual frames or frame sequneces, and a manifest file which points to these files. The Encoder helps you to convert the data you have to the data the UVOL player needs. The encoder script is located at: [`scripts/Encoder.py`](scripts/Encoder.py).
 
 The Encoder script requires a `json` configuration file. This config file is processed in a certain order that is explained below.
 
