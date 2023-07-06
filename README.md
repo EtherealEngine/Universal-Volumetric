@@ -1,14 +1,14 @@
 # Universal Volumetric
 
-The open source Universal Volumetric (".uvol") compressed interchange format for streaming mesh sequences.
+The open source Universal Volumetric compressed interchange format for streaming mesh sequences.
 
-## UVOL 2
+## UVOL 2.0
 
-UVOL2 introduces usage of Compressed Array Textures, in the form of KTX2 containerized files. These support wide variety of devices due to on the fly transcoding and due to KTX2's small file size, it comes with bandwidth advantages.
+UVOL 2.0 introduces usage of Compressed Array Textures, via KTX2 supercompressed textures, allowing volumetric media to use much less texture memory than UVOL 1.0!
 
-In this version, we also changed the geometry compression method from Corto to DRACO. Current version of UVOL2 needs directories of files which represent individual frames, and a manifest file which points to these directories. The Encoder helps you to convert the data you have to the data player needs. The encoder script is located at: [`scripts/Encoder.py`](scripts/Encoder.py).
+The geometry compression method has also been updated from Corto to Draco. UVOL2 uses directories of files which represent individual frames or frame sequneces, and a manifest file which points to these files. The Encoder helps you to convert the data you have to the data the UVOL player needs. The encoder script is located at: [`scripts/Encoder.py`](scripts/Encoder.py).
 
-User have to input a `config.json` file to the Encoder script. This config file is processed in a certain order that is explained below.
+The Encoder script requires a `json` configuration file. This config file is processed in a certain order that is explained below.
 
 ```ts
 {
@@ -43,7 +43,7 @@ Let's start with mandatory fields.
 - **`KTX2_BATCH_SIZE`**: This represents number of frames are packed (or to be packed) in a single KTX2 video texture.
 - **`OutputDirectory`**: The processed files are stored in this directory (labelled with their formats).
 
-Now, we discuss about how geometry data is processed: ![](https://i.imgur.com/HC0xuOO.png)
+Now, we discuss how geometry data is processed: ![](https://i.imgur.com/HC0xuOO.png)
 
 Followed by texture data processing: ![](https://i.imgur.com/xQs4uQR.png)
 
@@ -54,7 +54,7 @@ Below paths must have the file pattern mentioned.
 - ImagesPath: Eg: `/home/3D/export_#####.jpg`
 - KTX2FilesPath: Eg: `/home/3D/export_#####.ktx2`
 
-Frame numbers are calculated from the file names itself, Hence file names should be indexed (with padding). The manifest file also uses this notation in specifying `DRCURLPattern` and `KTX2URLPattern`. The indexing can be either 0 based indexing or 1 based indexing, but make sure it is consistent between Geometry files and Texture files. These indices are vital for the player to calculate right frame and render it with the right geometry/texture.
+Frame numbers are calculated from the file names itself, Hence file names should be indexed (with padding). The manifest file also uses this notation in specifying `DRCURLPattern` and `KTX2URLPattern`. The indexing can be either 0 based indexing or 1 based indexing, but make sure it is consistent between Geometry files and Texture files. These indices are vital for the player to calculate the correct frame and render it with the right geometry/texture.
 
 ### Demo
 
@@ -66,15 +66,13 @@ If you are proficient in C++, python, JS, Unity/C#, or you want to support this 
 
 ### Example
 
-Current uvol files consist of a .uvol binary, manifest file and video texture. Future versions will embed everything into the uvol binary or in a single MP4 container.
-
-Currently playback works in WebGL with three.js and Unity. Android and iOS are in development, Unreal support is on the roadmap (intrepid C++ developers should be able to port this in a day by reading the source from other examples, since the core codec is C++ based).
+Currently playback works in WebGL with three.js. Unity & Unreal support is on the roadmap.
 
 ### Requirements
 
 For encoding, you will Python 3 and blender python package installed.
 
-For decoding, currently WebGL is supported (especially three.js), Unreal and Unity will come in the next release.
+For decoding, currently WebGL is supported (especially three.js), Unreal and Unity will come in a future release.
 
 You will need a mesh and texture sequence in ABC/OBJ and PNG/JPG formats respectively.
 
