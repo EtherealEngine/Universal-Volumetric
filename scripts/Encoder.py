@@ -20,18 +20,25 @@ def convert_pounds_to_c_style(s):
     return s.replace("#" * pound_count, f"%0{pound_count}u")
 
 
-def check_executables():
+def check_executables(config):
     ok = True
-    if not which("draco_encoder"):
+
+    if which("draco_encoder"):
+        config["draco_encoder"] = which("draco_encoder")
+    elif not config.get("draco_encoder"):
         print(
             "❌ 'draco_encoder' command doesn't exist. Please build it from https://github.com/google/draco"
         )
         ok = False
-    if not which("basisu"):
+
+    if which("basisu"):
+        config["basisu"] = which("basisu")
+    elif not config.get("basisu"):
         print(
             "❌ 'basisu' command doesn't exist. Please build it from https://github.com/BinomialLLC/basis_universal"
         )
         ok = False
+
     if not ok:
         exit(1)
 
@@ -137,6 +144,8 @@ def check_total_frames(config):
             pass
         else:
             exit(1)
+    else:
+        print("✅ Frames and frame rates are compatible")
 
     uvol_durations = {
         "geometry": geometry_frame_count / config["GEOMETRY_FRAME_RATE"],
@@ -154,6 +163,8 @@ def main():
     if sys.argv[1] == "create-template":
         template_data_str = """{
   "name": "",
+  "draco_encoder": "", // path to draco_encoder binary
+  "basisu": "", // path to draco_encoder binary
   "ABCFilePath": "",
   "OBJFilesPath": "", // pattern with hashes. eg: OBJ/frame_###.obj
   "DRACOFilesPath": "", // pattern with hashes
@@ -180,11 +191,10 @@ def main():
         )
         return
 
-    check_executables()
-
     with open(sys.argv[1]) as f:
         config = json.load(f)
 
+    check_executables(config)
     check_all_fields(config)
 
     # converting to absolute path to avoid ambiguities later.
@@ -227,7 +237,7 @@ def main():
                 bpy.ops.export_scene.obj(filepath=output_path, use_selection=True)
 
         config["OBJFilesPath"] = os.path.join(
-            config["OutputDirectory"], "OBJ", "frame_#####.obj"
+            config["OutputDirectory"], "OBJ", "frame_#######.obj"
         )
 
     if config.get("OBJFilesPath", None):
@@ -235,7 +245,7 @@ def main():
 
         directory, pattern = os.path.split(config["OBJFilesPath"])
         obj_files = sorted(
-            [file for file in os.listdir(directory) if file.endswith("obj")]
+            [file for file in os.listdir(directory) if match_pattern(pattern, file)]
         )
         os.makedirs(os.path.join(config["OutputDirectory"], "DRC"), exist_ok=True)
         config["DRACOFilesPath"] = os.path.join(
@@ -246,7 +256,7 @@ def main():
         frame_index = 0
         for file in progress_bar:
             progress_bar.set_description(f"📦 Compressing frame {frame_index}")
-            command = f'draco_encoder -i "{os.path.join(directory, file)}" -o "{os.path.join(config["OutputDirectory"], "DRC", file + ".drc")}" -qp {config.get("Q_POSITION_ATTR", 11)} -qt {config.get("Q_TEXTURE_ATTR", 10)} -qn {config.get("Q_NORMAL_ATTR", 8)} -qg {config.get("Q_GENERIC_ATTR", 8)} -cl {config.get("DRACO_COMPRESSION_LEVEL", 7)}'
+            command = f'{config["draco_encoder"]} -i "{os.path.join(directory, file)}" -o "{os.path.join(config["OutputDirectory"], "DRC", file + ".drc")}" -qp {config.get("Q_POSITION_ATTR", 11)} -qt {config.get("Q_TEXTURE_ATTR", 10)} -qn {config.get("Q_NORMAL_ATTR", 8)} -qg {config.get("Q_GENERIC_ATTR", 8)} -cl {config.get("DRACO_COMPRESSION_LEVEL", 7)}'
             args = shlex.split(command)
             rc = subprocess.call(args, stdout=subprocess.DEVNULL)
             if rc:
@@ -276,7 +286,7 @@ def main():
             progress_bar.set_description(
                 f'📦 Compressing images from {current_file_index} to {current_file_index + config["KTX2_BATCH_SIZE"] - 1}'
             )
-            command = f'basisu -ktx2 -tex_type video -multifile_printf "{config["ImagesPath"]}" -multifile_num {config["KTX2_BATCH_SIZE"]} -multifile_first {config["KTX2_FIRST_FILE"]} -y_flip -output_file "{os.path.join(config["OutputDirectory"], "KTX2", "texture_%07u"%(current_file_index//config["KTX2_BATCH_SIZE"]))}.ktx2"'
+            command = f'{config["basisu"]} -ktx2 -tex_type video -multifile_printf "{config["ImagesPath"]}" -multifile_num {config["KTX2_BATCH_SIZE"]} -multifile_first {config["KTX2_FIRST_FILE"]} -y_flip -output_file "{os.path.join(config["OutputDirectory"], "KTX2", "texture_%07u"%(current_file_index//config["KTX2_BATCH_SIZE"]))}.ktx2"'
             args = shlex.split(command)
             rc = subprocess.call(args, stdout=subprocess.DEVNULL)
             if rc:
@@ -286,7 +296,9 @@ def main():
                 print("Command: ", command)
                 exit(1)
 
-        config["KTX2FilesPath"] = os.path.join(config["OutputDirectory"], "KTX2")
+        config["KTX2FilesPath"] = os.path.join(
+            config["OutputDirectory"], "KTX2", "texture_#######.ktx2"
+        )
 
     if config["KTX2FilesPath"]:
         print("✅ Obtained KTX2 files")
@@ -294,7 +306,6 @@ def main():
     uvol_durations, geometry_frame_count, texture_segment_count = check_total_frames(
         config
     )
-    print("✅ Frames and frame rates are compatible")
 
     manifestData = {
         "DRCURLPattern": os.path.relpath(

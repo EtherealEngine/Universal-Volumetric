@@ -13,6 +13,8 @@ The Encoder script requires a `json` configuration file. This config file is pro
 ```ts
 {
     name: string,
+    draco_encoder: string,
+    basisu: string,
     ABCFilePath: string,
     OBJFilesPath: string,
     DRACOFilesPath: string,
@@ -55,6 +57,13 @@ Below paths must have the file pattern mentioned.
 - KTX2FilesPath: Eg: `/home/3D/export_#####.ktx2`
 
 Frame numbers are calculated from the file names itself, Hence file names should be indexed (with padding). The manifest file also uses this notation in specifying `DRCURLPattern` and `KTX2URLPattern`. The indexing can be either 0 based indexing or 1 based indexing, but make sure it is consistent between Geometry files and Texture files. These indices are vital for the player to calculate the correct frame and render it with the right geometry/texture.
+
+### Usage
+
+- Encoder uses `bpy` python package which only works with selected python versions: Python >=3.7, <3.8.
+- Make sure you have `draco_encoder` and `basisu` binaries somewhere. The paths of those binaries can be either passed to the project-config, or they can be omitted if they're already in the path.
+- A template `project-config.json` can be created with this command: `python3 scripts/Encoder.py create-template`.
+- Fill the config file and pass it to the Encoder: `python3 scripts/Encoder.py project-config.json`. (Encoder raises errors if something isn't alright)
 
 ### Demo
 
