@@ -215,7 +215,7 @@ const VolumetricPlayer = (props: VolumetricPlayerProps) => {
 
   function startPlayer() {
     if (videoReady && dracosisSequence) {
-      dracosisSequence.video.play();
+      dracosisSequence.prepareNextLoop(0);
       setPlayIsStarted(true);
     }
   }
