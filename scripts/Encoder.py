@@ -1,7 +1,6 @@
 from shutil import which
 import sys
-import json
-import bpy
+import commentjson as json
 import os
 import subprocess
 import shlex
@@ -88,8 +87,9 @@ def check_all_fields(config):
 def match_pattern(pattern, file_name):
     # Assumes pattern contains seven pound characters (#)
     # Implying file name indices are padded with atmost 7 zeroes. Eg: 0000001
-    PAD_STRING = "#######"
-    PAD_LENGTH = len(PAD_STRING)
+    PAD_LENGTH = pattern.count('#')
+    PAD_STRING = '#' * PAD_LENGTH
+
     pad_index = pattern.find(PAD_STRING)
     if (
         (pattern[:pad_index] == file_name[:pad_index])
@@ -205,6 +205,7 @@ def main():
     stdout = io.StringIO()
 
     if config.get("ABCFilePath", None):
+        import bpy
         print("🚧 Obtained ABC File")
 
         # https://blender.stackexchange.com/a/220016/165060

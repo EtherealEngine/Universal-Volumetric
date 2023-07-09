@@ -79,6 +79,7 @@ export default class Player {
     private fileHeader: FileHeader | null
     private vertexShader: string
     private fragmentShader: string
+    //@ts-ignore
     private intervalId: NodeJS.Timer
 
     get currentTextureSegment(): number {
