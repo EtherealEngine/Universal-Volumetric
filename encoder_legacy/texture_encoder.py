@@ -41,7 +41,7 @@ def main(args):
     assert os.path.exists(Data_Path), 'The Dataset Folder not found. Please consider giving full(absolute) file path.'
 
     for files in os.listdir(Data_Path):
-        if files.endswith(".png"): # Exception Handling
+        if files.endswith(".png") or files.endswith('.jpg'): # Exception Handling
                 textures_in_group.append(Data_Path+"/"+files)
                 print("Adding texture " +  str(frame_number+1) + " to group")
                 frame_number = frame_number + 1
