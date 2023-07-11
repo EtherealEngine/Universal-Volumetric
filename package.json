@@ -23,7 +23,7 @@
   ],
   "homepage": "https://github.com/EtherealEngine/Universal-Volumetric#readme",
   "dependencies": {
-    "@types/three": "^0.150.1",
+    "@types/three": "0.153.0",
     "commander": "^10.0.0",
     "draco3d": "^1.5.6",
     "glob": "7.2.0",

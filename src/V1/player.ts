@@ -4,29 +4,17 @@ import {
   LinearFilter,
   Mesh,
   MeshBasicMaterial,
-  PlaneGeometry,
   sRGBEncoding,
   Texture,
   Uint16BufferAttribute,
   WebGLRenderer
 } from 'three'
 
-import { IFileHeader } from './Interfaces'
-
-export enum PlayMode {
-  single = 'single',
-  random = 'random',
-  loop = 'loop',
-  singleloop = 'singleloop'
-}
-
-type onMeshBufferingCallback = (progress: number) => void
-type onFrameShowCallback = (frame: number) => void
+import { V1FileHeader, onMeshBufferingCallback, onFrameShowCallback, onTrackEndCallback } from '../Interfaces'
 
 export type PlayerConstructorArgs = {
   renderer: WebGLRenderer
-  playMode?: PlayMode
-  paths: Array<string>
+  mesh: Mesh
   encoderWindowSize?: number
   encoderByteLength?: number
   videoSize?: number
@@ -35,6 +23,7 @@ export type PlayerConstructorArgs = {
   onFrameShow?: onFrameShowCallback
   worker?: Worker
   material?: MeshBasicMaterial | MeshBasicMaterial
+  onTrackEnd: onTrackEndCallback
 }
 
 export default class Player {
@@ -42,12 +31,12 @@ export default class Player {
 
   // Public Fields
   public renderer: WebGLRenderer
+  public mesh: Mesh
   public speed: number = 1.0 // Multiplied by framerate for final playback output rate
   public loop: boolean = true
   public encoderWindowSize = 8 // length of the databox
   public encoderByteLength = 16
   public videoSize = 1024
-  public playMode: PlayMode
   public waitForVideoLoad = 3 //3 seconds
   public autoPreview = true
   public targetFramesToRequest = 90
@@ -58,26 +47,21 @@ export default class Player {
   public pauseOnNextFrame: boolean = false
 
   // Three objects
-  public mesh: Mesh
-  public paths: Array<string>
   public material: MeshBasicMaterial
   public bufferGeometry: BufferGeometry
   public failMaterial?: MeshBasicMaterial
 
   // Private Fields
+  private manifestFilePath: string
   private _video: HTMLVideoElement = null
   private _videoTexture: Texture = null
   private meshBuffer: Map<number, BufferGeometry> = new Map()
   private _worker: Worker
   private onMeshBuffering: onMeshBufferingCallback | null = null
   private onFrameShow: onFrameShowCallback | null = null
-  fileHeader: IFileHeader
+  private onTrackEnd: onTrackEndCallback | null = null
+  fileHeader: V1FileHeader
   tempBufferObject: BufferGeometry
-
-  private currentTrack: number = 0
-  private nextTrack: number = 0
-  private manifestFilePath: string
-  private meshFilePath: string
 
   private videoCtx: CanvasRenderingContext2D
   private counterCtx: CanvasRenderingContext2D
@@ -100,8 +84,7 @@ export default class Player {
 
   constructor({
     renderer,
-    playMode,
-    paths,
+    mesh,
     encoderWindowSize = 8,
     encoderByteLength = 16,
     videoSize = 1024,
@@ -109,9 +92,11 @@ export default class Player {
     onMeshBuffering = null,
     onFrameShow = null,
     worker = null,
-    material = new MeshBasicMaterial()
+    material = new MeshBasicMaterial(),
+    onTrackEnd,
   }: PlayerConstructorArgs) {
     this.renderer = renderer
+    this.mesh = mesh
 
     this.onMeshBuffering = onMeshBuffering
     this.onFrameShow = onFrameShow
@@ -124,27 +109,8 @@ export default class Player {
     this._worker = worker ? worker : new Worker(Player.defaultWorkerURL, { type: 'module', name: 'UVOL' }) // spawn new worker;
     this._worker.onerror = console.error
 
-    this.paths = paths
-
-    // backwards-compat
-    if (typeof playMode === 'number') {
-      switch (playMode) {
-        case 1:
-          playMode = PlayMode.single
-          break
-        case 2:
-          playMode = PlayMode.random
-          break
-        case 3:
-          playMode = PlayMode.loop
-          break
-        case 4:
-          playMode = PlayMode.singleloop
-          break
-      }
-    }
-
-    this.playMode = playMode || PlayMode.loop
+    this.material = material
+    this.onTrackEnd = onTrackEnd
 
     //create video element
     this._video = video ? video : document.createElement('video')
@@ -154,14 +120,6 @@ export default class Player {
     this._video.preload = 'auto'
     this._video.muted = false
     this._video.autoplay = true
-
-    this.video.addEventListener('loadstart', () => {
-      for (const buffer of this.meshBuffer.values()) buffer?.dispose()
-      this.meshBuffer.clear()
-      this.nextFrameToRequest = 0
-      this.resetWorker()
-      this.video.playbackRate = 0
-    })
 
     const handleVideoFrame = (now, metadata) => {
       this._video.requestVideoFrameCallback(handleVideoFrame)
@@ -184,8 +142,8 @@ export default class Player {
       this._videoTexture.generateMipmaps = false
       this._videoTexture.minFilter = LinearFilter
       this._videoTexture.magFilter = LinearFilter
-      ;(this._videoTexture as any).isVideoTexture = true
-      ;(this._videoTexture as any).update = () => {}
+        ; (this._videoTexture as any).isVideoTexture = true
+        ; (this._videoTexture as any).update = () => { }
     } else {
       //create canvases for video and counter textures
       const counterCanvas = document.createElement('canvas')
@@ -205,9 +163,8 @@ export default class Player {
     }
 
     this._videoTexture.encoding = sRGBEncoding
-    this.material = material
+    
     this.material.map = this._videoTexture
-    this.mesh = new Mesh(new PlaneGeometry(0.00001, 0.00001), this.material)
 
     this._worker.onmessage = (e) => {
       switch (e.data.type) {
@@ -220,20 +177,25 @@ export default class Player {
           break
       }
     }
-
-    this.setTrackPath(this.currentTrack)
-    this.bufferLoop()
   }
 
-  printBufferRepresentation() {
-    let bufferRepresentation = ''
-    for (let i = 0; i < this.numberOfFrames; i++) {
-      if (this.currentVideoFrame === i) bufferRepresentation += 'O'
-      else if (this.meshBuffer.has(i)) bufferRepresentation += '*'
-      else if (this.nextFrameToRequest === i) bufferRepresentation += '+'
-      else bufferRepresentation += '-'
+  playTrack = (_fileHeader: V1FileHeader, _targetFramesToRequest, _manifestFilePath) => {
+    this.fileHeader = _fileHeader
+    this.manifestFilePath = _manifestFilePath
+
+    for (const buffer of this.meshBuffer.values()) buffer?.dispose()
+    this.meshBuffer.clear()
+    this.nextFrameToRequest = 0
+    
+    this.resetWorker()
+    this.video.playbackRate = 0
+    if (_targetFramesToRequest) {
+      this.targetFramesToRequest = _targetFramesToRequest
     }
-    // console.log(bufferRepresentation)
+
+    this.video.src = this.manifestFilePath.replace('.manifest', '.mp4')
+    this.video.load()
+    this.bufferLoop()
   }
 
   bufferLoop = () => {
@@ -261,7 +223,6 @@ export default class Player {
       }
 
       if (!meshBufferHasEnoughToPlay && typeof this.onMeshBuffering === 'function') {
-        // console.log('buffering ', this.meshBuffer.size / minimumBufferLength,',  have: ', this.meshBuffer.size, ', need: ', minimumBufferLength )
         this.onMeshBuffering(this.meshBuffer.size / minimumBufferLength)
       }
     }
@@ -272,7 +233,9 @@ export default class Player {
       if (this.video.autoplay && this.video.paused) this.video.play()
     }
 
-    if (this.video.ended) this.prepareNextLoop()
+    if (this.video.ended) {
+      this.onTrackEnd()
+    }
   }
 
   /**
@@ -316,33 +279,7 @@ export default class Player {
     this.removePlayedBuffer(frameToPlay)
   }
 
-  prepareNextLoop() {
-    if (this.playMode == PlayMode.random) {
-      this.nextTrack = Math.floor(Math.random() * this.paths.length)
-    } else if (this.playMode == PlayMode.single) {
-      this.nextTrack = (this.currentTrack + 1) % this.paths.length
-      if (this.currentTrack + 1 == this.paths.length) {
-        this.nextTrack = 0
-        this.isWorkerReady = false
-      }
-    } else if (this.playMode == PlayMode.singleloop) {
-      this.nextTrack = this.currentTrack
-    } else {
-      //PlayModeEnum.Loop
-      this.nextTrack = (this.currentTrack + 1) % this.paths.length
-    }
-
-    if (this.pauseOnNextTrack) {
-      this.pauseOnNextTrack = false
-      this.video.pause()
-    }
-
-    this.currentTrack = this.nextTrack
-    this.setTrackPath(this.currentTrack)
-  }
-
-  handleFrameData(messages) {
-    // console.log(`received frames ${messages[0].keyframeNumber} - ${messages[messages.length-1].keyframeNumber}`)
+  handleFrameData(messages) {    
     for (const frameData of messages) {
       let geometry = new BufferGeometry()
       geometry.setIndex(new Uint16BufferAttribute(frameData.bufferGeometry.index.buffer, 1))
@@ -354,17 +291,10 @@ export default class Player {
 
     if (typeof this.onMeshBuffering === 'function') {
       const minimumBufferLength = this.targetFramesToRequest * 2
-      // console.log('buffering ', this.meshBuffer.size / minimumBufferLength,',  have: ', this.meshBuffer.size, ', need: ', minimumBufferLength )
       this.onMeshBuffering(this.meshBuffer.size / minimumBufferLength)
     }
   }
 
-  setTrackPath(track) {
-    const path = this.paths[track % this.paths.length]
-    if (!path) return
-    this.video.src = path.replace('.drcs', '.mp4').replace('.uvol', '.mp4')
-    this.video.load()
-  }
 
   drawVideoAndGetCurrentFrameNumber(): number {
     const encoderWindowWidth = this.encoderWindowSize * this.encoderByteLength
@@ -397,37 +327,26 @@ export default class Player {
     return frameToPlay
   }
 
-  resetWorker() {
-    const manifestFilePath = (this.manifestFilePath = this.video.src.replace('.mp4', '.manifest'))
-    const meshFilePath = (this.meshFilePath = this.video.src.replace('.mp4', '.drcs'))
-    this.isWorkerReady = false
-    const xhr = new XMLHttpRequest()
-    xhr.onreadystatechange = () => {
-      if (xhr.readyState !== 4) return
-      this.fileHeader = JSON.parse(xhr.responseText)
-
-      if (this.numberOfFrames > this.maxNumberOfFrames) {
-        console.error(
-          'There are more frames (%d) in file then our decoder can handle(%d) with provided encoderByteLength(%d)',
-          this.numberOfFrames,
-          this.maxNumberOfFrames,
-          this.encoderByteLength
-        )
-      }
-
-      this._worker.postMessage({
-        type: 'initialize',
-        payload: {
-          targetFramesToRequest: this.targetFramesToRequest,
-          meshFilePath,
-          numberOfFrames: this.numberOfFrames,
-          fileHeader: this.fileHeader
-        }
-      }) // Send data to our worker.
+  resetWorker = () => {
+    const meshFilePath = this.manifestFilePath.replace('.manifest', '.drcs')
+    if (this.numberOfFrames > this.maxNumberOfFrames) {
+      console.error(
+        'There are more frames (%d) in file then our decoder can handle(%d) with provided encoderByteLength(%d)',
+        this.numberOfFrames,
+        this.maxNumberOfFrames,
+        this.encoderByteLength
+      )
     }
 
-    xhr.open('GET', manifestFilePath, true) // true for asynchronous
-    xhr.send()
+    this._worker.postMessage({
+      type: 'initialize',
+      payload: {
+        targetFramesToRequest: this.targetFramesToRequest,
+        meshFilePath,
+        numberOfFrames: this.numberOfFrames,
+        fileHeader: this.fileHeader
+      }
+    }) // Send data to our worker.
   }
 
   removePlayedBuffer(currentFrame: number) {
