@@ -198,6 +198,14 @@ export default class Player {
     this.bufferLoop()
   }
 
+  pause = () => {
+    if (this._video.paused) {
+      this._video.play()
+    } else {
+      this._video.pause()
+    }
+  }
+
   bufferLoop = () => {
     if (!this.video) return // has been disposed
 

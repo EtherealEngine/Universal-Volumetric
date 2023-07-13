@@ -26,6 +26,8 @@ export type PlayerConstructorArgs = {
 }
 
 export default class Player {
+    static defaultWorkerURL = new URL('./V1/worker.build.js', import.meta.url).href
+
     // Public Fields
     public renderer: WebGLRenderer
     public playMode: PlayMode
@@ -35,8 +37,8 @@ export default class Player {
     public encoderWindowSize = 8 // length of the databox
     public encoderByteLength = 16
     public videoSize = 1024
-    public geometryBufferSize: number = 125
-    public textureBufferSize: number = 15
+    public bufferDuration = 6 // V2 player buffer length in seconds
+    public intervalDuration = 3 // V2 player fetchBuffer period in seconds
 
     // Three objects
     public paths: Array<string>
@@ -75,7 +77,7 @@ export default class Player {
         this.encoderWindowSize = encoderWindowSize
         this.encoderByteLength = encoderByteLength
         this.videoSize = videoSize
-        this._worker = worker
+        this._worker = worker ? worker : new Worker(Player.defaultWorkerURL, { type: 'module', name: 'UVOL' }) // spawn new worker;
         this.material = material
         this.targetFramesToRequest = targetFramesToRequest
         this._video = video
@@ -152,7 +154,7 @@ export default class Player {
     play() {
         console.log(this.fileHeader)
         if (this.fileHeader.Version && this.fileHeader.Version == 'v2') {
-            this.v2Instance.playTrack(this.fileHeader)
+            this.v2Instance.playTrack(this.fileHeader, this.bufferDuration, this.intervalDuration)
         } else {
             this.v1Instance.playTrack(this.fileHeader, this.targetFramesToRequest, this.paths[this.currentTrack])
         }

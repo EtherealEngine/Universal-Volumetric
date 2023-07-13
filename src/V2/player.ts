@@ -32,10 +32,10 @@ export type PlayerConstructorArgs = {
 export default class Player {
     // Public Fields
     public renderer: WebGLRenderer
-    public geometryBufferSize: number
-    public textureBufferSize: number
     public currentGeometryFrame: number
     public currentTextureFrame: number
+    public bufferDuration: number // in seconds. Player tries to store frames sufficient to play these many seconds
+    public intervalDuration: number // number of seconds between fetchBuffers calls
 
 
     // Three objects
@@ -44,11 +44,13 @@ export default class Player {
     private dracoLoader: DRACOLoader
     private failMaterial: Material | null = null
     private shaderMaterial: ShaderMaterial // to reuse this material
-    private clock: Clock | null
+    private startTime: number // in milliseconds
+    private pausedTime: number
+    private totalPausedDuration: number
+    private isClockPaused: boolean
 
     // Private Fields
     private currentTime: number = 0
-    private currentTrackId: number = 0
     private meshMap: Map<number, BufferGeometry> = new Map()
     private textureMap: Map<number, CompressedArrayTexture> = new Map()
     private onMeshBuffering: onMeshBufferingCallback | null = null
@@ -60,8 +62,7 @@ export default class Player {
     private fileHeader: V2FileHeader | null
     private vertexShader: string
     private fragmentShader: string
-    //@ts-ignore
-    private intervalId: NodeJS.Timer
+    private intervalId: number
 
     get currentTextureSegment(): number {
         if (this.fileHeader) {
@@ -75,7 +76,7 @@ export default class Player {
         if (this.fileHeader.AudioURL) {
             return this.audio.paused
         } else {
-            return !this.clock.running
+            return this.isClockPaused
         }
     }
 
@@ -130,49 +131,55 @@ export default class Player {
         this.failMaterial = new MeshBasicMaterial({ color: 0xffffff })
     }
 
-    playTrack = (_fileHeader: V2FileHeader, _geometryBufferSize?: number, _textureBufferSize?: number) => {
+    playTrack = (_fileHeader: V2FileHeader, _bufferDuration?: number, _intervalDuration?: number) => {
         this.fileHeader = _fileHeader
 
-        if (_geometryBufferSize) {
-            this.geometryBufferSize = _geometryBufferSize
+        if (_bufferDuration) {
+            this.bufferDuration = _bufferDuration
         } else {
-            // Always make sure, we have 3 seconds of buffer.
-            this.geometryBufferSize = 3 * this.fileHeader.GeometryFrameRate;
+            this.bufferDuration = 6000
         }
 
-        if (_textureBufferSize) {
-            this.textureBufferSize = _textureBufferSize
+        if (_intervalDuration) {
+            this.intervalDuration = _intervalDuration
         } else {
-            // segments instead of frames
-            this.textureBufferSize = Math.ceil((3 * this.fileHeader.TextureFrameRate) / this.fileHeader.BatchSize)
+            this.intervalDuration = 3;
         }
 
         if (this.fileHeader.AudioURL) {
             this.audio.src = this.fileHeader.AudioURL
             this.audio.currentTime = 0
-            this.clock = null
-        } else {
-            // Managing time with THREE.Clock, since this video doesn't have audio
-            this.clock = new Clock()
         }
 
         this.currentGeometryFrame = 0
         this.currentTextureFrame = 0
-        this.currentTime = 0
         this.lastRequestedGeometryFrame = -1
         this.lastRequestedTextureSegment = -1
+
+        this.totalPausedDuration = 0
+        this.isClockPaused = true
+        this.pausedTime = 0
+        
+        /**
+         * fetch every 'intervalDuration' seconds. 'intervalDuration' is tightly coupled with bufferDuration.
+         * If the bufferDuration is small, this intervalDuration should be small.
+         * If bufferDuration is large, intervalDuration should be large as well to allow transcoding textures.
+         */
         this.fetchBuffers(this.startVideo); /** Fetch initial buffers, and the start video */
+
+        //@ts-ignore NodeJS namespace isn't available here
+        this.intervalId = setInterval(() => {
+            this.fetchBuffers();
+        }, this.intervalDuration * 1000); // seconds to milliseconds
     }
 
     startVideo = () => {
         if (this.fileHeader.AudioURL) {
             this.audio.play()
         } else {
-            this.clock.start()
+            this.startTime = Date.now()
+            this.isClockPaused = false
         }
-        this.intervalId = setInterval(() => {
-            this.fetchBuffers();
-        }, 100);
     }
 
     /**
@@ -204,24 +211,36 @@ export default class Player {
     fetchBuffers = (callback?: fetchBuffersCallback) => {
         const promises = []
 
-        if ((this.lastRequestedGeometryFrame - this.currentGeometryFrame) < this.geometryBufferSize && this.lastRequestedGeometryFrame != (this.fileHeader.GeometryFrameCount - 1)) {
-            let currentRequestingFrame = this.lastRequestedGeometryFrame + 1;
-            this.lastRequestedGeometryFrame = Math.min(this.currentGeometryFrame + this.geometryBufferSize, this.fileHeader.GeometryFrameCount - 1);
-            for (; currentRequestingFrame <= this.lastRequestedGeometryFrame; currentRequestingFrame++) {
-                const padWidth = this.countHashChar(this.fileHeader.DRCURLPattern);
-                const dracoURL = this.fileHeader.DRCURLPattern.replace('#'.repeat(padWidth), this.pad(currentRequestingFrame, padWidth));
-                promises.push(this.decodeDraco(dracoURL, currentRequestingFrame));
-            }
-        }
+        for (let i = 0; i < this.bufferDuration; i++) {
+            const geometryBufferSize = this.fileHeader.GeometryFrameRate;
+            if ((this.lastRequestedGeometryFrame - this.currentGeometryFrame) < (this.bufferDuration * geometryBufferSize) && this.lastRequestedGeometryFrame != (this.fileHeader.GeometryFrameCount - 1)) {
+                let currentRequestingFrame = this.lastRequestedGeometryFrame + 1;
+                const currentRequestEnd = Math.min(this.currentGeometryFrame + ((i + 1) * geometryBufferSize), this.fileHeader.GeometryFrameCount - 1);
+                if (currentRequestEnd < currentRequestingFrame)
+                    continue;
+                this.lastRequestedGeometryFrame = currentRequestEnd
+                for (; currentRequestingFrame <= this.lastRequestedGeometryFrame; currentRequestingFrame++) {
+                    const padWidth = this.countHashChar(this.fileHeader.DRCURLPattern);
+                    const dracoURL = this.fileHeader.DRCURLPattern.replace('#'.repeat(padWidth), this.pad(currentRequestingFrame, padWidth));
+                    promises.push(this.decodeDraco(dracoURL, currentRequestingFrame));
 
-        if ((this.lastRequestedTextureSegment - this.currentTextureSegment) < this.textureBufferSize && this.lastRequestedTextureSegment != (this.fileHeader.TextureSegmentCount - 1)) {
-            let currentRequestingTextureSegment = this.lastRequestedTextureSegment + 1;
-            this.lastRequestedTextureSegment = Math.min(this.currentTextureSegment + this.textureBufferSize, this.fileHeader.TextureSegmentCount - 1);
-            for (; currentRequestingTextureSegment <= this.lastRequestedTextureSegment; currentRequestingTextureSegment++) {
-                const padWidth = this.countHashChar(this.fileHeader.KTX2URLPattern);
-                const textureURL = this.fileHeader.KTX2URLPattern.replace('#'.repeat(padWidth), this.pad(currentRequestingTextureSegment, padWidth));
-                promises.push(this.decodeKTX2(textureURL, currentRequestingTextureSegment));
+                }
             }
+            
+            const textureBufferSize = Math.ceil(this.fileHeader.TextureFrameRate / this.fileHeader.BatchSize);
+            if ((this.lastRequestedTextureSegment - this.currentTextureSegment) < (this.bufferDuration * textureBufferSize) && this.lastRequestedTextureSegment != (this.fileHeader.TextureSegmentCount - 1)) {
+                let currentRequestingTextureSegment = this.lastRequestedTextureSegment + 1;
+                const currentRequestEnd =  Math.min(this.currentTextureSegment + (i + 1) * textureBufferSize, this.fileHeader.TextureSegmentCount - 1);
+                if (currentRequestEnd < currentRequestingTextureSegment)
+                    continue;
+                this.lastRequestedTextureSegment = currentRequestEnd
+                for (; currentRequestingTextureSegment <= this.lastRequestedTextureSegment; currentRequestingTextureSegment++) {
+                    const padWidth = this.countHashChar(this.fileHeader.KTX2URLPattern);
+                    const textureURL = this.fileHeader.KTX2URLPattern.replace('#'.repeat(padWidth), this.pad(currentRequestingTextureSegment, padWidth));
+                    promises.push(this.decodeKTX2(textureURL, currentRequestingTextureSegment));
+                }
+            }
+
         }
 
         if (callback) {
@@ -249,6 +268,29 @@ export default class Player {
         })
     }
 
+    pause = () => {
+        /**
+         * If playing, calling pause(), pauses UVOL.
+         * If paused, calling pause(), plays UVOL.
+         */
+
+        if (this.fileHeader.AudioURL)  {
+            if (this.audio.paused) {
+                this.audio.play()
+            } else {
+                this.audio.pause()
+            }
+        } else {
+            if (this.isClockPaused) {
+                this.totalPausedDuration += Date.now() - this.pausedTime
+                this.isClockPaused = false
+            } else {
+                this.isClockPaused = true
+                this.pausedTime = Date.now()
+            }
+        }
+    }
+
     processFrame = () => {
         if (!this.fileHeader) {
             return;
@@ -259,7 +301,7 @@ export default class Player {
              * Usually, this case arises when new track is set and fetchBuffers is still loading next frames.
              * Until, startVideo is called, this.paused stays true.
              */
-            this.onMeshBuffering(this.meshMap.size / this.geometryBufferSize)
+            this.onMeshBuffering(this.meshMap.size / (this.fileHeader.GeometryFrameRate * (this.bufferDuration)))
             return;
         }
 
@@ -267,7 +309,8 @@ export default class Player {
         if (this.fileHeader.AudioURL) {
             this.currentTime = this.audio.currentTime;
         } else {
-            this.currentTime += this.clock.getDelta()
+            const currentTimeMS = (Date.now() - this.startTime) - (this.totalPausedDuration);
+            this.currentTime = currentTimeMS / 1000;
         }
 
         this.currentGeometryFrame = Math.round(this.currentTime * this.fileHeader.GeometryFrameRate)
