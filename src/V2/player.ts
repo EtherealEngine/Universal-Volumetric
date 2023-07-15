@@ -26,7 +26,8 @@ export type PlayerConstructorArgs = {
     onMeshBuffering?: onMeshBufferingCallback
     onFrameShow?: onFrameShowCallback
     mesh: Mesh
-    onTrackEnd: onTrackEndCallback
+    onTrackEnd: onTrackEndCallback,
+    audio?: HTMLAudioElement
 }
 
 export default class Player {
@@ -85,7 +86,8 @@ export default class Player {
         onMeshBuffering,
         onFrameShow,
         mesh,
-        onTrackEnd
+        onTrackEnd,
+        audio
     }: PlayerConstructorArgs) {
         this.renderer = renderer
 
@@ -105,7 +107,7 @@ export default class Player {
         this.dracoLoader.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.4.3/");
         this.dracoLoader.preload();
 
-        this.audio = document.createElement('audio')
+        this.audio = audio ? audio : document.createElement('audio')
 
         this.vertexShader = `uniform vec2 size;
         out vec2 vUv;

@@ -70,7 +70,7 @@ def check_all_fields(config):
         exit(1)
 
     if config.get("ImagesPath"):
-        if config.get("KTX2_FIRST_FILE") and config.get("KTX2_FILE_COUNT"):
+        if isinstance(config.get("KTX2_FIRST_FILE"), int) and isinstance(config.get("KTX2_FILE_COUNT"), int):
             pass
         else:
             print(
@@ -287,7 +287,7 @@ def main():
             progress_bar.set_description(
                 f'📦 Compressing images from {current_file_index} to {current_file_index + config["KTX2_BATCH_SIZE"] - 1}'
             )
-            command = f'{config["basisu"]} -ktx2 -tex_type video -multifile_printf "{config["ImagesPath"]}" -multifile_num {config["KTX2_BATCH_SIZE"]} -multifile_first {config["KTX2_FIRST_FILE"]} -y_flip -output_file "{os.path.join(config["OutputDirectory"], "KTX2", "texture_%07u"%(current_file_index//config["KTX2_BATCH_SIZE"]))}.ktx2"'
+            command = f'{config["basisu"]} -ktx2 -tex_type video -multifile_printf "{config["ImagesPath"]}" -multifile_num {config["KTX2_BATCH_SIZE"]} -multifile_first {current_file_index} -y_flip -output_file "{os.path.join(config["OutputDirectory"], "KTX2", "texture_%07u"%(current_file_index//config["KTX2_BATCH_SIZE"]))}.ktx2"'
             args = shlex.split(command)
             rc = subprocess.call(args, stdout=subprocess.DEVNULL)
             if rc:
@@ -309,6 +309,7 @@ def main():
     )
 
     manifestData = {
+        "Version": "v2",
         "DRCURLPattern": os.path.relpath(
             config["DRACOFilesPath"], config["OutputDirectory"]
         ),

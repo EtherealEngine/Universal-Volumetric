@@ -8,21 +8,25 @@ import {
     WebGLRenderer
 } from 'three'
 
-import {onMeshBufferingCallback, onFrameShowCallback, PlayMode} from "./Interfaces"
+import { onMeshBufferingCallback, onFrameShowCallback, PlayMode } from "./Interfaces"
 
 export type PlayerConstructorArgs = {
-    renderer: WebGLRenderer
-    playMode?: PlayMode
-    paths: Array<string>
-    encoderWindowSize?: number
-    encoderByteLength?: number
-    videoSize?: number
-    video?: HTMLVideoElement
-    onMeshBuffering?: onMeshBufferingCallback
+    renderer: WebGLRenderer,
+    playMode?: PlayMode,
+    paths: Array<string>,
+    onMeshBuffering?: onMeshBufferingCallback,
     onFrameShow?: onFrameShowCallback
-    worker?: Worker
-    material?: MeshBasicMaterial | MeshBasicMaterial
-    targetFramesToRequest: number
+    V1Args: {
+        encoderWindowSize?: number,
+        encoderByteLength?: number,
+        videoSize?: number,
+        worker?: Worker,
+        material?: MeshBasicMaterial | MeshBasicMaterial,
+        video?: HTMLVideoElement
+    },
+    V2Args: {
+        audio?: HTMLAudioElement
+    }
 }
 
 export default class Player {
@@ -49,51 +53,43 @@ export default class Player {
     private onFrameShow: onFrameShowCallback | null = null
     private _worker: Worker
     private _video: HTMLVideoElement = null
+    private _audio: HTMLAudioElement = null
     private material: MeshBasicMaterial
     private currentTrack: number
     private fileHeader: any
 
-    constructor({
-        renderer,
-        playMode,
-        paths,
-        encoderWindowSize = 8,
-        encoderByteLength = 16,
-        videoSize = 1024,
-        video = null,
-        onMeshBuffering = null,
-        onFrameShow = null,
-        worker = null,
-        material = new MeshBasicMaterial(),
-        targetFramesToRequest = 90
-    }: PlayerConstructorArgs) {
-        this.renderer = renderer
-        this.playMode = playMode
-        this.paths = paths
+    constructor(props: PlayerConstructorArgs) {
+        this.renderer = props.renderer
+        this.playMode = props.playMode
+        this.paths = props.paths
 
-        this.onMeshBuffering = onMeshBuffering
-        this.onFrameShow = onFrameShow
+        this.onMeshBuffering = props.onMeshBuffering
+        this.onFrameShow = props.onFrameShow
 
-        this.encoderWindowSize = encoderWindowSize
-        this.encoderByteLength = encoderByteLength
-        this.videoSize = videoSize
-        this._worker = worker ? worker : new Worker(Player.defaultWorkerURL, { type: 'module', name: 'UVOL' }) // spawn new worker;
-        this.material = material
-        this.targetFramesToRequest = targetFramesToRequest
-        this._video = video
+        if (props.V1Args) {
+            this.encoderWindowSize = props.V1Args.encoderWindowSize ? props.V1Args.encoderWindowSize : 8
+            this.encoderByteLength = props.V1Args.encoderByteLength ? props.V1Args.encoderByteLength : 16
+            this.videoSize = props.V1Args.videoSize ? props.V1Args.videoSize : 1024
+            this._worker = props.V1Args.worker ? props.V1Args.worker : new Worker(Player.defaultWorkerURL, { type: 'module', name: 'UVOL' }) // spawn new worker;
+            this.material = props.V1Args.material
+            this._video = props.V1Args.video
+        }
+
+        if (props.V2Args) {
+            this._audio = props.V2Args.audio
+        }
+
         this.currentTrack = 0
         this.v1Instance = null
         this.v2Instance = null
         this.mesh = new Mesh(new PlaneGeometry(0.00001, 0.00001), this.material)
     }
 
-    
 
-    setCurrentTrack = (_nextTrack?: number) => {
+
+    public setTrackPath = (_nextPath?: string) => {
         this.fileHeader = null
-        if (typeof _nextTrack !== 'undefined') {
-            this.currentTrack = _nextTrack
-        } else {
+        if (typeof _nextPath === 'undefined') {
             let nextTrack = null
             if (this.playMode == PlayMode.random) {
                 nextTrack = Math.floor(Math.random() * this.paths.length)
@@ -110,9 +106,10 @@ export default class Player {
             }
 
             this.currentTrack = nextTrack
+            _nextPath = this.paths[this.currentTrack]
         }
-        
-        fetch(this.paths[this.currentTrack]).then(response => response.json()).then(json => {
+
+        fetch(_nextPath).then(response => response.json()).then(json => {
             this.fileHeader = json
             if (this.fileHeader.Version && this.fileHeader.Version == 'v2') {
                 if (!this.v2Instance) {
@@ -121,7 +118,8 @@ export default class Player {
                         onMeshBuffering: this.onMeshBuffering,
                         onFrameShow: this.onFrameShow,
                         mesh: this.mesh,
-                        onTrackEnd: this.setCurrentTrack,
+                        onTrackEnd: this.setTrackPath,
+                        audio: this._audio
                     })
                     console.info('Created UVOL2 Player Instance')
                 } else {
@@ -140,7 +138,7 @@ export default class Player {
                         onFrameShow: this.onFrameShow,
                         worker: this._worker,
                         material: this.material,
-                        onTrackEnd: this.setCurrentTrack
+                        onTrackEnd: this.setTrackPath
                     })
                     console.info('Created UVOL1 Player Instance')
                 } else {
@@ -149,6 +147,14 @@ export default class Player {
             }
             this.play()
         })
+    }
+
+    pause() {
+        if (this.fileHeader.Version && this.fileHeader.Version == 'v2') {
+            this.v2Instance.pause()
+        } else {
+            this.v1Instance.pause()
+        }
     }
 
     play() {
