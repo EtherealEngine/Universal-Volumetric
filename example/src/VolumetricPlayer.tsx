@@ -1,124 +1,135 @@
-import React, { useEffect, useRef, useState } from 'react';
-import Player from "universal-volumetric/dist/Player";
-
+import React, { useEffect, useRef, useState } from 'react'
 import {
+  Group,
+  Object3D,
   PerspectiveCamera,
   Scene,
+  SRGBColorSpace,
+  sRGBEncoding,
   Vector3,
   WebGLRenderer,
-  sRGBEncoding,
-  SRGBColorSpace,
-  Object3D,
-  Group,
-} from 'three';
-import { OrbitControls } from 'three-stdlib';
+  WebGLRendererParameters
+} from 'three'
+import { OrbitControls } from 'three-stdlib'
+import Player from 'universal-volumetric/dist/Player'
 
-const cameraOrbitingHeight = 1.7;
-const cameraDistance = 6.5;
-const cameraVerticalOffset = 0.4;
-const cameraFov = 35;
+const cameraOrbitingHeight = 1.7
+const cameraDistance = 6.5
+const cameraVerticalOffset = 0.4
+const cameraFov = 35
 
 type VolumetricPlayerProps = {
-  paths: Array<string>;
-  style: any;
-};
+  paths: Array<string>
+  style: any
+}
 
 const VolumetricPlayer = (props: VolumetricPlayerProps) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const rendererRef = useRef<WebGLRenderer | null>(null);
-  const playerRef = useRef<Player | null>(null);
-  const anchorRef = useRef<Object3D | null>(null);
-  const sceneRef = useRef<Object3D | null>(null);
-  const cameraRef = useRef<PerspectiveCamera | null>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
-  let animationFrameId: number;
-  const [dracosisSequence, setDracosisSequence] =
-    useState<Player | null>(null);
-  const [playIsStarted, setPlayIsStarted] = useState(false);
-  const [isBuffering, setIsBuffering] = useState(false);
-  const [bufferingProgress, setBufferingProgress] = useState(0);
-  const [bufferingTimestamp, setBufferingTimestamp] = useState(Date.now());
-  const [, setForceRerender] = useState(0);
-  const videoReady = !!dracosisSequence;
+  const containerRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const rendererRef = useRef<WebGLRenderer | null>(null)
+  const playerRef = useRef<Player | null>(null)
+  const anchorRef = useRef<Object3D | null>(null)
+  const sceneRef = useRef<Object3D | null>(null)
+  const cameraRef = useRef<PerspectiveCamera | null>(null)
+  const controlsRef = useRef<OrbitControls | null>(null)
+  let animationFrameId: number
+  const [dracosisSequence, setDracosisSequence] = useState<Player | null>(null)
+  const [playIsStarted, setPlayIsStarted] = useState(false)
+  const [isBuffering, setIsBuffering] = useState(false)
+  const [bufferingProgress, setBufferingProgress] = useState(0)
+  const [bufferingTimestamp, setBufferingTimestamp] = useState(Date.now())
+  const [, setForceRerender] = useState(0)
+  const videoReady = !!dracosisSequence
 
   useEffect(() => {
-    const container = containerRef.current;
+    const container = containerRef.current
     if (!container) {
-      return;
+      return
     }
     if (!canvasRef.current) {
-      return;
+      return
     }
 
     let w = (container as any).clientWidth,
-      h = (container as any).clientHeight;
+      h = (container as any).clientHeight
     if (!sceneRef.current) {
-      sceneRef.current = new Scene();
+      sceneRef.current = new Scene()
     }
-    const scene = sceneRef.current;
+    const scene = sceneRef.current
 
     if (!anchorRef.current) {
-      anchorRef.current = new Group();
+      anchorRef.current = new Group()
     }
-    const anchor = anchorRef.current;
-    scene.add(anchor);
+    const anchor = anchorRef.current
+    scene.add(anchor)
 
     if (!cameraRef.current) {
-      cameraRef.current = new PerspectiveCamera(cameraFov, w / h, 0.001, 100);
+      cameraRef.current = new PerspectiveCamera(cameraFov, w / h, 0.001, 100)
     }
-    const camera = cameraRef.current;
+    const camera = cameraRef.current
     if (!controlsRef.current) {
-      controlsRef.current = new OrbitControls(camera, container);
+      controlsRef.current = new OrbitControls(camera, container)
       controlsRef.current.addEventListener('change', () => {
-        renderNeedsUpdate = true;
-      });
+        renderNeedsUpdate = true
+      })
     }
-    const controls = controlsRef.current;
+    const controls = controlsRef.current
 
-    const renderConfig = {
+    const renderConfig: WebGLRendererParameters = {
       canvas: canvasRef.current,
-      antialias: true,
+      // antialias: true,
       alpha: true,
-    };
+      precision: 'highp',
+      powerPreference: 'high-performance',
+      stencil: false,
+      antialias: false,
+      depth: true,
+      logarithmicDepthBuffer: true,
+      // canvas,
+      // context,
+      preserveDrawingBuffer: false,
+      //@ts-ignore
+      multiviewStereo: true
+    }
     if (!rendererRef.current) {
-      rendererRef.current = new WebGLRenderer(renderConfig);
-      rendererRef.current.debug.checkShaderErrors = false;
+      console.log('config: ', renderConfig)
+      rendererRef.current = new WebGLRenderer(renderConfig)
+      rendererRef.current.debug.checkShaderErrors = false
     }
-    let renderer = rendererRef.current;
+    let renderer = rendererRef.current
     if (controls) {
-      controls.target = new Vector3(0, cameraOrbitingHeight, 0);
-      controls.panSpeed = 0.4;
-      camera.position.set(0, cameraOrbitingHeight, cameraDistance);
-      camera.lookAt(controls.target);
+      controls.target = new Vector3(0, cameraOrbitingHeight, 0)
+      controls.panSpeed = 0.4
+      camera.position.set(0, cameraOrbitingHeight, cameraDistance)
+      camera.lookAt(controls.target)
     }
-    renderer.outputColorSpace = SRGBColorSpace;
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(w, h);
-    (container as any).appendChild(renderer.domElement);
+    renderer.outputColorSpace = SRGBColorSpace
+    renderer.setPixelRatio(window.devicePixelRatio)
+    renderer.setSize(w, h)
+    ;(container as any).appendChild(renderer.domElement)
     const onResize = function () {
-      console.log('onResize!');
-      w = (container as any).clientWidth;
-      h = (container as any).clientHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-      setCameraOffset();
-      renderNeedsUpdate = true;
-    };
+      console.log('onResize!')
+      w = (container as any).clientWidth
+      h = (container as any).clientHeight
+      camera.aspect = w / h
+      camera.updateProjectionMatrix()
+      renderer.setSize(w, h)
+      setCameraOffset()
+      renderNeedsUpdate = true
+    }
 
-    window.addEventListener('resize', onResize);
+    window.addEventListener('resize', onResize)
 
     /**
      * shift camera from it's center
      */
     function setCameraOffset() {
-      const fullWidth = w;
-      const fullHeight = h + h * Math.abs(cameraVerticalOffset);
-      const width = w;
-      const height = h;
-      const x = 0;
-      const y = h * cameraVerticalOffset;
+      const fullWidth = w
+      const fullHeight = h + h * Math.abs(cameraVerticalOffset)
+      const width = w
+      const height = h
+      const x = 0
+      const y = h * cameraVerticalOffset
       /*
         fullWidth — full width of multiview setup
         fullHeight — full height of multiview setup
@@ -127,116 +138,96 @@ const VolumetricPlayer = (props: VolumetricPlayerProps) => {
         width — width of subcamera
         height — height of subcamera
        */
-      camera.setViewOffset(fullWidth, fullHeight, x, y, width, height);
+      camera.setViewOffset(fullWidth, fullHeight, x, y, width, height)
     }
-    setCameraOffset();
+    setCameraOffset()
 
-    let renderNeedsUpdate = false;
+    let renderNeedsUpdate = false
     function render() {
-      animationFrameId = requestAnimationFrame(render);
-      playerRef.current?.update();
-      controls?.update();
-      renderer.render(scene, camera);
+      animationFrameId = requestAnimationFrame(render)
+      playerRef.current?.update()
+      controls?.update()
+      renderer.render(scene, camera)
     }
 
-    console.log('create new player');
-    // dummy to test
-    // const box = new Mesh(
-    //   new BoxBufferGeometry(0.5, 1.45, 0.5),
-    //   new MeshNormalMaterial()
-    // );
-    // box.position.y = 1.45 / 2;
-    // scene.add(box);
-    //
-    // const head = new Mesh(
-    //   new SphereBufferGeometry(0.25),
-    //   new MeshNormalMaterial()
-    // );
-    // head.position.y = 1.7;
-    // scene.add(head);
+    console.log('create new player')
 
     if (!playerRef.current) {
       playerRef.current = new Player({
         renderer,
         paths: props.paths,
         onMeshBuffering: (progress: number) => {
-          console.warn(
-            'BUFFERING!!',
-            progress
-          );
-          setBufferingProgress(Math.round(progress * 100));
-          setIsBuffering(true);
-          setBufferingTimestamp(Date.now());
-          setTimeout(() => setForceRerender(Math.random()), 100);
+          console.warn('BUFFERING!!', progress)
+          setBufferingProgress(Math.round(progress * 100))
+          setIsBuffering(true)
+          setBufferingTimestamp(Date.now())
+          setTimeout(() => setForceRerender(Math.random()), 100)
         },
         onFrameShow: () => {
-          setIsBuffering(false);
-        },
-      });
-      scene.add(playerRef.current.mesh as any);
+          setIsBuffering(false)
+        }
+      })
+      playerRef.current.mesh.scale.setScalar(0.001)
+      scene.add(playerRef.current.mesh as any)
     }
 
     //test purpose
     //@ts-ignore
-    window.UVOLPlayer = playerRef.current;
+    window.UVOLPlayer = playerRef.current
 
-    setDracosisSequence(playerRef.current);
+    setDracosisSequence(playerRef.current)
 
-    console.log('+++  dracosisSequence');
+    console.log('+++  dracosisSequence')
 
-    render();
+    render()
 
     return () => {
-      console.log('+++ CLEANUP player');
+      console.log('+++ CLEANUP player')
 
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener('resize', onResize);
+      cancelAnimationFrame(animationFrameId)
+      window.removeEventListener('resize', onResize)
       // clear volumetric player
-      playerRef.current?.dispose();
+      playerRef.current?.dispose()
 
-      playerRef.current = null;
-      sceneRef.current = null;
-      anchorRef.current = null;
-      cameraRef.current = null;
+      playerRef.current = null
+      sceneRef.current = null
+      anchorRef.current = null
+      cameraRef.current = null
 
-      controlsRef.current?.dispose();
-      controlsRef.current = null;
+      controlsRef.current?.dispose()
+      controlsRef.current = null
 
-      setDracosisSequence(null);
-      setPlayIsStarted(false);
-      setIsBuffering(false);
-    };
-  }, []);
+      setDracosisSequence(null)
+      setPlayIsStarted(false)
+      setIsBuffering(false)
+    }
+  }, [])
 
   function startPlayer() {
     if (videoReady && dracosisSequence) {
-      dracosisSequence.setCurrentTrack(0);
-      setPlayIsStarted(true);
+      dracosisSequence.setTrackPath()
+      setPlayIsStarted(true)
     }
   }
 
-  const timeSincebufferingStarted = Date.now() - bufferingTimestamp;
+  const timeSincebufferingStarted = Date.now() - bufferingTimestamp
 
   const playButton = playIsStarted ? null : (
-    <button
-      onTouchEnd={() => startPlayer()}
-      onClick={() => startPlayer()}
-      className={'button player-play'}
-    >
+    <button onTouchEnd={() => startPlayer()} onClick={() => startPlayer()} className={'button player-play'}>
       {videoReady ? 'Play' : 'Loading...'}
     </button>
-  );
+  )
   const bufferingIndication =
     playIsStarted && isBuffering && timeSincebufferingStarted > 80 ? (
       <div className={'buffering-indication'}>Buffering...</div>
-    ) : null;
+    ) : null
   return (
     <div className="volumetric__player" style={props.style} ref={containerRef}>
       {playButton}
       {bufferingIndication}
       <canvas ref={canvasRef} className={'mainCanvas'} />
     </div>
-  );
-};
+  )
+}
 
-export default VolumetricPlayer;
+export default VolumetricPlayer

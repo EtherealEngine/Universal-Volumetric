@@ -1,4 +1,4 @@
-import { CortoDecoder } from './corto'
+import { CortoDecoder } from '../lib/corto'
 
 let _meshFilePath
 let _fileHeader

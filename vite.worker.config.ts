@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vite'
 
 export default defineConfig({
   // ...
@@ -6,9 +6,9 @@ export default defineConfig({
     lib: {
       fileName: 'V1/worker.build',
       formats: ['es'],
-      entry: 'src/V1/worker.ts',
+      entry: 'src/V1/worker.ts'
     },
 
-    emptyOutDir: false,
-  },
-});
+    emptyOutDir: false
+  }
+})

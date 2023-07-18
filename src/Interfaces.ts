@@ -1,46 +1,48 @@
 export interface IFrameData {
-    frameNumber: number;
-    keyframeNumber: number;
-    startBytePosition: number;
-    vertices: number;
-    faces: number;
-    meshLength: number;
+  frameNumber: number
+  keyframeNumber: number
+  startBytePosition: number
+  vertices: number
+  faces: number
+  meshLength: number
 }
 
 export interface V1FileHeader {
-    maxVertices: number;
-    maxTriangles: number;
-    frameData: IFrameData[];
-    frameRate: number;
+  maxVertices: number
+  maxTriangles: number
+  frameData: IFrameData[]
+  frameRate: number
 }
 
 export interface V2FileHeader {
-    Version: string;
-    DRCURLPattern: string;
-    KTX2URLPattern: string;
-    AudioURL: string;
-    BatchSize: number;
-    GeometryFrameCount: number;
-    TextureSegmentCount: number;
-    GeometryFrameRate: number;
-    TextureFrameRate: number;
+  Version: string
+  DRCURLPattern: string
+  KTX2URLPattern: string
+  AudioURL: string
+  BatchSize: number
+  GeometryFrameCount: number
+  TextureSegmentCount: number
+  GeometryFrameRate: number
+  TextureFrameRate: number
 }
 
+export type FileHeader = V1FileHeader | V2FileHeader
+
 export interface onMeshBufferingCallback {
-    (progress: number): void
+  (progress: number): void
 }
 
 export interface onFrameShowCallback {
-    (frame: number): void
+  (frame: number): void
 }
 
 export interface onTrackEndCallback {
-    (): void
+  (): void
 }
 
 export enum PlayMode {
-    single = 'single',
-    random = 'random',
-    loop = 'loop',
-    singleloop = 'singleloop'
+  single = 'single',
+  random = 'random',
+  loop = 'loop',
+  singleloop = 'singleloop'
 }

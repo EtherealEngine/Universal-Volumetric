@@ -1,13 +1,18 @@
-import { defineConfig } from 'vite';
-import reactRefresh from '@vitejs/plugin-react-refresh';
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
+import mkcert from 'vite-plugin-mkcert'
 
-// https://vitejs.dev/config/
 export default defineConfig({
-  // plugins: [reactRefresh()],
+  plugins: [
+    react(),
+    // mkcert()
+  ],
   optimizeDeps: {
-    exclude: ['@etherealengine/volumetric'],
+    exclude: ['universal-volumetric']
   },
   server: {
     fs: { allow: ['..'] },
-  },
-});
+    // https: true,
+    port: 3000
+  }
+})

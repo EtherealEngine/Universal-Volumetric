@@ -11,7 +11,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build-player": "tsc",
     "build-worker": "vite build --config vite.worker.config.ts",
-    "build": "npm run build-player && npm run build-worker"
+    "build": "npm run build-player && npm run build-worker",
+    "clean-node-modules": "npx rimraf node_modules && npx rimraf package-lock.json && npx rimraf yarn.lock"
   },
   "license": "MIT",
   "bugs": {
@@ -32,6 +33,7 @@
     "xmlhttprequest": "^1.8.0"
   },
   "devDependencies": {
+    "@trivago/prettier-plugin-sort-imports": "^4.1.1",
     "@types/draco3d": "^1.4.2",
     "prettier": "^2.8.7",
     "ts-loader": "^9.4.2",

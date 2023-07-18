@@ -24,22 +24,21 @@ You may merge the Pull Request in once you have the sign-off of two other develo
 
 Increase the version numbers in any examples files and the README.md to the new version that this Pull Request would represent. The versioning scheme we use is SemVer. (https://semver.org/)
 
-
-
 ## Pull Request Template
 
 ## Summary
 
-* Some retargeting system clean-up
-* Removed redundant math functions
+- Some retargeting system clean-up
+- Removed redundant math functions
 
 ## Checklist
+
 - [ ] CI/CD checks pass `npm run check`
   - [ ] Linter passing via `npm run lint`
   - [ ] Typescript passing via `npm run check-errors`
   - [ ] Unit & Integration tests passing via `npm run test`
   - [ ] Docker build process passing via `npm run build-client`
-- [ ] If this PR is still a WIP, convert to a draft 
+- [ ] If this PR is still a WIP, convert to a draft
 - [ ] When this PR is ready, mark it as "Ready for review"
 - [ ] Changes have been manually QA'd
 - [ ] Changes reviewed by at least 2 approved reviewers
@@ -59,5 +58,4 @@ List any additional steps required to QA the changes of this PR, as well as any 
 
 ## Reviewers
 
-Reviewers for this PR
-@[github id]
+Reviewers for this PR @[github id]

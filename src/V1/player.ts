@@ -10,7 +10,7 @@ import {
   WebGLRenderer
 } from 'three'
 
-import { V1FileHeader, onMeshBufferingCallback, onFrameShowCallback, onTrackEndCallback } from '../Interfaces'
+import { onFrameShowCallback, onMeshBufferingCallback, onTrackEndCallback, V1FileHeader } from '../Interfaces'
 
 export type PlayerConstructorArgs = {
   renderer: WebGLRenderer
@@ -22,8 +22,8 @@ export type PlayerConstructorArgs = {
   onMeshBuffering?: onMeshBufferingCallback
   onFrameShow?: onFrameShowCallback
   worker?: Worker
-  material?: MeshBasicMaterial | MeshBasicMaterial
   onTrackEnd: onTrackEndCallback
+  targetFramesToRequest?: number
 }
 
 export default class Player {
@@ -39,7 +39,7 @@ export default class Player {
   public videoSize = 1024
   public waitForVideoLoad = 3 //3 seconds
   public autoPreview = true
-  public targetFramesToRequest = 90
+  public targetFramesToRequest
 
   public useVideoRequestCallback: boolean
 
@@ -92,8 +92,8 @@ export default class Player {
     onMeshBuffering = null,
     onFrameShow = null,
     worker = null,
-    material = new MeshBasicMaterial(),
     onTrackEnd,
+    targetFramesToRequest
   }: PlayerConstructorArgs) {
     this.renderer = renderer
     this.mesh = mesh
@@ -109,8 +109,9 @@ export default class Player {
     this._worker = worker ? worker : new Worker(Player.defaultWorkerURL, { type: 'module', name: 'UVOL' }) // spawn new worker;
     this._worker.onerror = console.error
 
-    this.material = material
+    this.material = new MeshBasicMaterial({ color: 0xffffff })
     this.onTrackEnd = onTrackEnd
+    this.targetFramesToRequest = targetFramesToRequest
 
     //create video element
     this._video = video ? video : document.createElement('video')
@@ -142,8 +143,8 @@ export default class Player {
       this._videoTexture.generateMipmaps = false
       this._videoTexture.minFilter = LinearFilter
       this._videoTexture.magFilter = LinearFilter
-        ; (this._videoTexture as any).isVideoTexture = true
-        ; (this._videoTexture as any).update = () => { }
+      ;(this._videoTexture as any).isVideoTexture = true
+      ;(this._videoTexture as any).update = () => {}
     } else {
       //create canvases for video and counter textures
       const counterCanvas = document.createElement('canvas')
@@ -163,7 +164,7 @@ export default class Player {
     }
 
     this._videoTexture.encoding = sRGBEncoding
-    
+
     this.material.map = this._videoTexture
 
     this._worker.onmessage = (e) => {
@@ -186,7 +187,7 @@ export default class Player {
     for (const buffer of this.meshBuffer.values()) buffer?.dispose()
     this.meshBuffer.clear()
     this.nextFrameToRequest = 0
-    
+
     this.resetWorker()
     this.video.playbackRate = 0
     if (_targetFramesToRequest) {
@@ -287,7 +288,7 @@ export default class Player {
     this.removePlayedBuffer(frameToPlay)
   }
 
-  handleFrameData(messages) {    
+  handleFrameData(messages) {
     for (const frameData of messages) {
       let geometry = new BufferGeometry()
       geometry.setIndex(new Uint16BufferAttribute(frameData.bufferGeometry.index.buffer, 1))
@@ -302,7 +303,6 @@ export default class Player {
       this.onMeshBuffering(this.meshBuffer.size / minimumBufferLength)
     }
   }
-
 
   drawVideoAndGetCurrentFrameNumber(): number {
     const encoderWindowWidth = this.encoderWindowSize * this.encoderByteLength

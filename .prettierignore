@@ -3,3 +3,6 @@
 web/Interfaces.ts
 web/corto.ts
 **/*.d.ts
+.github/*
+dist/*
+src/lib/*
