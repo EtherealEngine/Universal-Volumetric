@@ -87,8 +87,8 @@ export default class Player {
     if (props.V2Args) {
       const optionalArgs = ['bufferDuration', 'intervalDuration']
       optionalArgs.forEach((arg, _) => {
-        if (typeof props.V1Args[arg] !== 'undefined') {
-          this[arg] = props.V1Args[arg]
+        if (typeof props.V2Args[arg] !== 'undefined') {
+          this[arg] = props.V2Args[arg]
         }
       })
     }
