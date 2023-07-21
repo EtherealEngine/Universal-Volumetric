@@ -73,6 +73,7 @@ export default class Player {
   currentMeshFrame: number = 0
   currentVideoFrame: number = 0
   nextFrameToRequest: number = 0
+  private startedVideo: boolean
 
   get video() {
     return this._video
@@ -178,6 +179,7 @@ export default class Player {
           break
       }
     }
+    this.startedVideo = false
   }
 
   playTrack = (_fileHeader: V1FileHeader, _targetFramesToRequest, _manifestFilePath) => {
@@ -195,6 +197,7 @@ export default class Player {
     }
 
     this.video.src = this.manifestFilePath.replace('.manifest', '.mp4')
+    this.startedVideo = false
     this.video.load()
     this.bufferLoop()
   }
@@ -239,7 +242,10 @@ export default class Player {
     //play only when buffer goes to fill to enough
     if (meshBufferHasEnoughToPlay) {
       this.video.playbackRate = this.speed
-      if (this.video.autoplay && this.video.paused) this.video.play()
+      if (this.video.autoplay && this.video.paused && !this.startedVideo) {
+        this.video.play()
+        this.startedVideo = true
+      }
     }
 
     if (this.video.ended) {

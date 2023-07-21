@@ -286,7 +286,7 @@ export default class Player {
 
   play = () => {
     if (this.fileHeader.AudioURL) {
-      this.audio.pause()
+      this.audio.play()
     } else {
       this.totalPausedDuration += Date.now() - this.pausedTime
       this.isClockPaused = false
