@@ -200,11 +200,11 @@ export default class Player {
   }
 
   pause = () => {
-    if (this._video.paused) {
-      this._video.play()
-    } else {
-      this._video.pause()
-    }
+    this._video.pause()
+  }
+
+  play = () => {
+    this._video.play()
   }
 
   bufferLoop = () => {

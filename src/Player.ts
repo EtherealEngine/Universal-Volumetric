@@ -41,6 +41,12 @@ export default class Player {
   public v1Instance: V1Player | null = null
   public v2Instance: V2Player | null = null
   public playMode: PlayMode
+  public video: HTMLVideoElement = null
+
+  // When track is being played and paused somewhere, paused:true, stopped:false
+  // When track is finished or no tracks are available, paused: true, stopped:true
+  public paused: boolean
+  public stopped: boolean
 
   // Three objects
   public paths: Array<string>
@@ -50,7 +56,6 @@ export default class Player {
   private onMeshBuffering: onMeshBufferingCallback | null = null
   private onFrameShow: onFrameShowCallback | null = null
   private onTrackEnd: onTrackEndCallback | null = null
-  private video: HTMLVideoElement = null
   public encoderWindowSize = 8
   public encoderByteLength = 16
   public videoSize = 1024
@@ -71,7 +76,11 @@ export default class Player {
 
     this.onMeshBuffering = props.onMeshBuffering
     this.onFrameShow = props.onFrameShow
-    this.onTrackEnd = props.onTrackEnd ? props.onTrackEnd : this.setTrackPath
+    this.onTrackEnd = props.onTrackEnd ? () => {
+      this.paused = true
+      this.stopped = true
+      props.onTrackEnd()
+    } : this.setTrackPath
     this.video = props.video
 
     if (props.V1Args) {
@@ -97,6 +106,9 @@ export default class Player {
     this.v1Instance = null
     this.v2Instance = null
     this.mesh = new Mesh(new PlaneGeometry(0.00001, 0.00001), new MeshBasicMaterial({ color: 0xffffff }))
+
+    this.paused = true
+    this.stopped = true
   }
 
   get isV2() {
@@ -146,9 +158,9 @@ export default class Player {
               onTrackEnd: this.onTrackEnd,
               audio: this.video as HTMLAudioElement
             })
-            console.info('Created UVOL2 Player Instance')
+            console.log('Created UVOL2 Player Instance')
           } else {
-            console.info('Reusing existing UVOL2 Instance')
+            console.log('Reusing existing UVOL2 Instance')
           }
         } else {
           if (!this.v1Instance) {
@@ -169,30 +181,47 @@ export default class Player {
               onTrackEnd: this.onTrackEnd,
               targetFramesToRequest: this.targetFramesToRequest
             })
-            console.info('Created UVOL1 Player Instance')
+            console.log('Created UVOL1 Player Instance')
           } else {
-            console.info('Reusing existing UVOL1 Instance')
+            console.log('Reusing existing UVOL1 Instance')
           }
         }
-        this.play()
+        this.playTrack()
       })
   }
 
   pause() {
+    if (!this.fileHeader)
+      return
     if (this.isV2) {
       this.v2Instance.pause()
     } else {
       this.v1Instance.pause()
     }
+    this.paused = true
+    this.stopped = false
   }
 
   play() {
-    console.log(this.fileHeader)
+    if (!this.fileHeader)
+      return
+    if (this.isV2) {
+      this.v2Instance.play()
+    } else {
+      this.v1Instance.play()
+    }
+    this.paused = false
+    this.stopped = false
+  }
+
+  playTrack() {
     if (this.isV2) {
       this.v2Instance.playTrack(this.fileHeader as V2FileHeader, this.bufferDuration, this.intervalDuration)
     } else {
       this.v1Instance.playTrack(this.fileHeader as V1FileHeader, this.targetFramesToRequest, this.currentManifestPath)
     }
+    this.paused = false
+    this.stopped = false
   }
 
   update() {

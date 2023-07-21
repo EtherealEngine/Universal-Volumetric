@@ -276,25 +276,20 @@ export default class Player {
   }
 
   pause = () => {
-    /**
-     * If playing, calling pause(), pauses UVOL.
-     * If paused, calling pause(), plays UVOL.
-     */
-
     if (this.fileHeader.AudioURL) {
-      if (this.audio.paused) {
-        this.audio.play()
-      } else {
-        this.audio.pause()
-      }
+      this.audio.pause()
     } else {
-      if (this.isClockPaused) {
-        this.totalPausedDuration += Date.now() - this.pausedTime
-        this.isClockPaused = false
-      } else {
-        this.isClockPaused = true
-        this.pausedTime = Date.now()
-      }
+      this.isClockPaused = true
+      this.pausedTime = Date.now()
+    }
+  }
+
+  play = () => {
+    if (this.fileHeader.AudioURL) {
+      this.audio.pause()
+    } else {
+      this.totalPausedDuration += Date.now() - this.pausedTime
+      this.isClockPaused = false
     }
   }
 
