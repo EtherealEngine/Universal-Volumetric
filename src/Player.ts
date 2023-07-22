@@ -42,6 +42,7 @@ export default class Player {
   public v2Instance: V2Player | null = null
   public playMode: PlayMode
   public video: HTMLVideoElement = null
+  public fileHeader: FileHeader
 
   // When track is being played and paused somewhere, paused:true, stopped:false
   // When track is finished or no tracks are available, paused: true, stopped:true
@@ -66,7 +67,6 @@ export default class Player {
   public intervalDuration = 2 // V2 player fetchBuffer period in seconds
 
   private currentTrack: number
-  private fileHeader: FileHeader
   private currentManifestPath: string
 
   constructor(props: PlayerConstructorArgs) {
@@ -79,6 +79,7 @@ export default class Player {
     this.onTrackEnd = props.onTrackEnd ? () => {
       this.paused = true
       this.stopped = true
+      this.fileHeader = null
       props.onTrackEnd()
     } : this.setTrackPath
     this.video = props.video

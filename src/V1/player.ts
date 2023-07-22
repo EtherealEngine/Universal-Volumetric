@@ -116,12 +116,6 @@ export default class Player {
 
     //create video element
     this._video = video ? video : document.createElement('video')
-    this._video.crossOrigin = 'anonymous'
-    this._video.playbackRate = 0
-    this._video.playsInline = true
-    this._video.preload = 'auto'
-    this._video.muted = false
-    this._video.autoplay = true
 
     const handleVideoFrame = (now, metadata) => {
       this._video.requestVideoFrameCallback(handleVideoFrame)
@@ -191,7 +185,6 @@ export default class Player {
     this.nextFrameToRequest = 0
 
     this.resetWorker()
-    this.video.playbackRate = 0
     if (_targetFramesToRequest) {
       this.targetFramesToRequest = _targetFramesToRequest
     }
@@ -241,8 +234,7 @@ export default class Player {
 
     //play only when buffer goes to fill to enough
     if (meshBufferHasEnoughToPlay) {
-      this.video.playbackRate = this.speed
-      if (this.video.autoplay && this.video.paused && !this.startedVideo) {
+      if (this.video.autoplay && !this.startedVideo) {
         this.video.play()
         this.startedVideo = true
       }

@@ -150,8 +150,9 @@ export default class Player {
     this.lastRequestedTextureSegment = -1
 
     this.totalPausedDuration = 0
-    this.isClockPaused = true
+    this.isClockPaused = false
     this.pausedTime = 0
+    this.currentTime = 0
 
     /**
      * fetch every 'intervalDuration' seconds. 'intervalDuration' is tightly coupled with bufferDuration.
@@ -288,8 +289,10 @@ export default class Player {
     if (this.fileHeader.AudioURL) {
       this.audio.play()
     } else {
-      this.totalPausedDuration += Date.now() - this.pausedTime
-      this.isClockPaused = false
+      if (this.isClockPaused) {
+        this.totalPausedDuration += Date.now() - this.pausedTime
+        this.isClockPaused = false
+      }
     }
   }
 
