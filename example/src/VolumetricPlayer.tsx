@@ -5,13 +5,13 @@ import {
   PerspectiveCamera,
   Scene,
   SRGBColorSpace,
-  sRGBEncoding,
   Vector3,
   WebGLRenderer,
   WebGLRendererParameters
 } from 'three'
 import { OrbitControls } from 'three-stdlib'
 import Player from 'universal-volumetric/dist/Player'
+import Stats from 'stats.js'
 
 const cameraOrbitingHeight = 1.7
 const cameraDistance = 6.5
@@ -40,6 +40,10 @@ const VolumetricPlayer = (props: VolumetricPlayerProps) => {
   const [bufferingTimestamp, setBufferingTimestamp] = useState(Date.now())
   const [, setForceRerender] = useState(0)
   const videoReady = !!dracosisSequence
+
+  const stats = new Stats()
+  stats.showPanel(1)
+
 
   useEffect(() => {
     const container = containerRef.current
@@ -94,7 +98,7 @@ const VolumetricPlayer = (props: VolumetricPlayerProps) => {
     if (!rendererRef.current) {
       console.log('config: ', renderConfig)
       rendererRef.current = new WebGLRenderer(renderConfig)
-      rendererRef.current.debug.checkShaderErrors = false
+      rendererRef.current.debug.checkShaderErrors = true
     }
     let renderer = rendererRef.current
     if (controls) {
@@ -107,6 +111,7 @@ const VolumetricPlayer = (props: VolumetricPlayerProps) => {
     renderer.setPixelRatio(window.devicePixelRatio)
     renderer.setSize(w, h)
     ;(container as any).appendChild(renderer.domElement)
+    ;(container as any).appendChild(stats.dom)
     const onResize = function () {
       console.log('onResize!')
       w = (container as any).clientWidth
@@ -144,9 +149,11 @@ const VolumetricPlayer = (props: VolumetricPlayerProps) => {
 
     let renderNeedsUpdate = false
     function render() {
-      animationFrameId = requestAnimationFrame(render)
+      stats.begin()
       playerRef.current?.update()
+      stats.end()
       controls?.update()
+      animationFrameId = requestAnimationFrame(render)
       renderer.render(scene, camera)
     }
 

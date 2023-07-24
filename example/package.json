@@ -9,6 +9,7 @@
   "dependencies": {
     "react": "^17.0.0",
     "react-dom": "^17.0.0",
+    "stats.js": "^0.17.0",
     "three": "^0.153.0",
     "three-stdlib": "^2.10.1",
     "universal-volumetric": "link:.."
