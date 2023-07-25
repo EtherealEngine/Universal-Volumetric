@@ -38,7 +38,6 @@ export default class Player {
   public encoderByteLength = 16
   public videoSize = 1024
   public waitForVideoLoad = 3 //3 seconds
-  public autoPreview = true
   public targetFramesToRequest
 
   public useVideoRequestCallback: boolean

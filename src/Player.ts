@@ -14,11 +14,8 @@ import V2Player from './V2/player'
 
 export type PlayerConstructorArgs = {
   renderer: WebGLRenderer
-  playMode?: PlayMode
-  paths: Array<string>
   onMeshBuffering?: onMeshBufferingCallback
   onFrameShow?: onFrameShowCallback
-  onTrackEnd?: onTrackEndCallback
   video?: HTMLVideoElement
   V1Args?: {
     encoderWindowSize?: number
@@ -31,55 +28,70 @@ export type PlayerConstructorArgs = {
     bufferDuration?: number
     intervalDuration?: number
   }
-}
+} & ({
+  playMode: PlayMode.loop | PlayMode.random | PlayMode.single | PlayMode.singleloop
+  paths: Array<string>
+  onTrackEnd?: onTrackEndCallback
+} | {
+  /**
+   * To manage play mode externally, Player expects onTrackEnd callback.
+   */
+  playMode: PlayMode.unmanaged
+  onTrackEnd: onTrackEndCallback
+})
 
 export default class Player {
+  // Constants
   static defaultWorkerURL = new URL('./V1/worker.build.js', import.meta.url).href
-
-  // Public Fields
-  public renderer: WebGLRenderer
-  public v1Instance: V1Player | null = null
-  public v2Instance: V2Player | null = null
-  public playMode: PlayMode
-  public video: HTMLVideoElement = null
-  public fileHeader: FileHeader
-
-  // When track is being played and paused somewhere, paused:true, stopped:false
-  // When track is finished or no tracks are available, paused: true, stopped:true
-  public paused: boolean
-  public stopped: boolean
-
-  // Three objects
-  public paths: Array<string>
-  public mesh: Mesh
-
-  // Private Fields
-  private onMeshBuffering: onMeshBufferingCallback | null = null
-  private onFrameShow: onFrameShowCallback | null = null
-  private onTrackEnd: onTrackEndCallback | null = null
   public encoderWindowSize = 8
   public encoderByteLength = 16
   public videoSize = 1024
   public targetFramesToRequest = 90
-  private worker: Worker
-
   public bufferDuration = 4 // V2 player buffer length in seconds
   public intervalDuration = 2 // V2 player fetchBuffer period in seconds
 
+  // Public Fields
+  public video: HTMLVideoElement
+  public mesh: Mesh
+  /** When track is being played and paused somewhere, paused:true, stopped:false
+   * When track is finished or no tracks are available, paused: true, stopped:true
+   */
+  public paused: boolean
+  public stopped: boolean
+
+  // Private Fields
+
+  // Callbacks
+  private onMeshBuffering: onMeshBufferingCallback | null = null
+  private onFrameShow: onFrameShowCallback | null = null
+  private onTrackEnd: onTrackEndCallback | null = null
+
+  // Player data
+  private paths: Array<string> | null
+  private renderer: WebGLRenderer
+  private playMode: PlayMode
+  private header: FileHeader
+  private v1Instance: V1Player = null
+  private v2Instance: V2Player = null
+  private worker: Worker
+  
+  // Track data
   private currentTrack: number
   private currentManifestPath: string
 
   constructor(props: PlayerConstructorArgs) {
     this.renderer = props.renderer
     this.playMode = props.playMode
-    this.paths = props.paths
+    if (props.playMode != PlayMode.unmanaged) {
+      this.paths = props.paths
+    }
 
     this.onMeshBuffering = props.onMeshBuffering
     this.onFrameShow = props.onFrameShow
     this.onTrackEnd = props.onTrackEnd ? () => {
       this.paused = true
       this.stopped = true
-      this.fileHeader = null
+      this.header = null
       props.onTrackEnd()
     } : this.setTrackPath
     this.video = props.video
@@ -113,14 +125,14 @@ export default class Player {
   }
 
   get isV2() {
-    if ('Version' in this.fileHeader && this.fileHeader.Version == 'v2') {
+    if ('version' in this.header && this.header.version == 'v2') {
       return true
     }
     return false
   }
 
   public setTrackPath = (_nextPath?: string) => {
-    this.fileHeader = null
+    this.header = null
     if (typeof _nextPath === 'undefined') {
       let nextTrack = null
       if (typeof this.currentTrack === 'undefined') {
@@ -147,7 +159,7 @@ export default class Player {
     fetch(_nextPath)
       .then((response) => response.json())
       .then((json) => {
-        this.fileHeader = json
+        this.header = json
         this.currentManifestPath = _nextPath
         if (this.isV2) {
           if (!this.v2Instance) {
@@ -159,9 +171,9 @@ export default class Player {
               onTrackEnd: this.onTrackEnd,
               audio: this.video as HTMLAudioElement
             })
-            console.log('Created UVOL2 Player Instance')
+            console.info('[UVOLPlayer] Created UVOL2 Player Instance')
           } else {
-            console.log('Reusing existing UVOL2 Instance')
+            console.info('[UVOLPlayer] Reusing existing UVOL2 Instance')
           }
         } else {
           if (!this.v1Instance) {
@@ -182,9 +194,9 @@ export default class Player {
               onTrackEnd: this.onTrackEnd,
               targetFramesToRequest: this.targetFramesToRequest
             })
-            console.log('Created UVOL1 Player Instance')
+            console.info('[UVOLPlayer] Created UVOL1 Player Instance')
           } else {
-            console.log('Reusing existing UVOL1 Instance')
+            console.info('[UVOLPlayer] Reusing existing UVOL1 Instance')
           }
         }
         this.playTrack()
@@ -192,7 +204,7 @@ export default class Player {
   }
 
   pause() {
-    if (!this.fileHeader)
+    if (!this.header)
       return
     if (this.isV2) {
       this.v2Instance.pause()
@@ -204,7 +216,7 @@ export default class Player {
   }
 
   play() {
-    if (!this.fileHeader)
+    if (!this.header)
       return
     if (this.isV2) {
       this.v2Instance.play()
@@ -217,16 +229,16 @@ export default class Player {
 
   playTrack() {
     if (this.isV2) {
-      this.v2Instance.playTrack(this.fileHeader as V2FileHeader, this.bufferDuration, this.intervalDuration)
+      this.v2Instance.playTrack(this.header as V2FileHeader, this.bufferDuration, this.intervalDuration)
     } else {
-      this.v1Instance.playTrack(this.fileHeader as V1FileHeader, this.targetFramesToRequest, this.currentManifestPath)
+      this.v1Instance.playTrack(this.header as V1FileHeader, this.targetFramesToRequest, this.currentManifestPath)
     }
     this.paused = false
     this.stopped = false
   }
 
   update() {
-    if (!this.fileHeader) {
+    if (!this.header) {
       return
     }
     if (this.isV2) {

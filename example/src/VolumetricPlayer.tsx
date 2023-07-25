@@ -12,6 +12,7 @@ import {
 import { OrbitControls } from 'three-stdlib'
 import Player from 'universal-volumetric/dist/Player'
 import Stats from 'stats.js'
+import { PlayMode } from '../../dist/Interfaces'
 
 const cameraOrbitingHeight = 1.7
 const cameraDistance = 6.5
@@ -172,7 +173,9 @@ const VolumetricPlayer = (props: VolumetricPlayerProps) => {
         },
         onFrameShow: () => {
           setIsBuffering(false)
-        }
+        },
+        playMode: PlayMode.loop,
+        video: document.createElement('video')
       })
       playerRef.current.mesh.scale.setScalar(0.001)
       scene.add(playerRef.current.mesh as any)
