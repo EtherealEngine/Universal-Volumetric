@@ -51,10 +51,10 @@ Followed by texture data processing: ![](https://i.imgur.com/xQs4uQR.png)
 
 Below paths must have the file pattern mentioned.
 
-- OBJFilesPath: Eg: `/home/3D/export_#####.obj`
-- DRACOFilesPath: Eg: `/home/3D/export_#####.drc`
-- ImagesPath: Eg: `/home/3D/export_#####.jpg`
-- KTX2FilesPath: Eg: `/home/3D/export_#####.ktx2`
+- OBJFilesPath: Eg: `/home/3D/export_[#####].obj`
+- DRACOFilesPath: Eg: `/home/3D/export_[#####].drc`
+- ImagesPath: Eg: `/home/3D/export_[#####].jpg`
+- KTX2FilesPath: Eg: `/home/3D/export_[#####].ktx2`
 
 Frame numbers are calculated from the file names itself, Hence file names should be indexed (with padding). The manifest file also uses this notation in specifying `DRCURLPattern` and `KTX2URLPattern`. The indexing can be either 0 based indexing or 1 based indexing, but make sure it is consistent between Geometry files and Texture files. These indices are vital for the player to calculate the correct frame and render it with the right geometry/texture.
 

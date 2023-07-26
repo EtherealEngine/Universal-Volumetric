@@ -10,7 +10,7 @@ import {
   WebGLRenderer
 } from 'three'
 
-import { onFrameShowCallback, onMeshBufferingCallback, onTrackEndCallback, V2FileHeader } from '../Interfaces'
+import { onFrameShowCallback, onMeshBufferingCallback, onTrackEndCallback, V2Schema } from '../Interfaces'
 import { FORMATS_TO_EXT, GeometryTarget, KTX2TextureTarget } from '../Interfaces'
 import { DRACOLoader } from '../lib/DRACOLoader'
 import { KTX2Loader } from '../lib/KTX2Loader'
@@ -81,7 +81,7 @@ export default class Player {
   private lastRequestedGeometryFrame: number
   private lastRequestedTextureSegment: number
   private audio: HTMLAudioElement
-  private header: V2FileHeader | null
+  private manifest: V2Schema | null
   private vertexShader: string
   private fragmentShader: string
   private intervalId: number
@@ -138,21 +138,22 @@ export default class Player {
   }
 
   get AudioURL(): string {
-    if (!this.header || !this.header.output.audio) return null
-    const path = this.header.output.audio.path.replace('[ext]', FORMATS_TO_EXT[this.header.output.audio.formats[0]])
+    if (!this.manifest || !this.manifest.audio) return null
+    const format = Array.isArray(this.manifest.audio.format) ? this.manifest.audio.format[0] : this.manifest.audio.format
+    const path = this.manifest.audio.path.replace('[ext]', FORMATS_TO_EXT[format])
     return path
   }
 
   private getGeometryURL = (frameNo: number) => {
-    const targetData = this.header.output.geometry.targets[this.geometryTarget]
-    const padWidth = countHashChar(this.header.output.geometry.path)
+    const targetData = this.manifest.geometry.targets[this.geometryTarget]
+    const padWidth = countHashChar(this.manifest.geometry.path)
 
     const INPUTS = {
       '[target]': this.geometryTarget,
       '[ext]': FORMATS_TO_EXT[targetData.format]
     }
     INPUTS[`[${'#'.repeat(padWidth)}]`] = pad(frameNo, padWidth)
-    let path = this.header.output.geometry.path
+    let path = this.manifest.geometry.path
     Object.keys(INPUTS).forEach((key) => {
       path = path.replace(key, INPUTS[key])
     })
@@ -160,8 +161,8 @@ export default class Player {
   }
 
   private getTextureURL = (segmentNo: number) => {
-    const targetData = this.header.output.texture.targets[this.textureTarget]
-    const padWidth = countHashChar(this.header.output.texture.path)
+    const targetData = this.manifest.texture.targets[this.textureTarget]
+    const padWidth = countHashChar(this.manifest.texture.path)
     const INPUTS = {
       '[target]': this.textureTarget,
       '[type]': this.textureType,
@@ -171,7 +172,7 @@ export default class Player {
     INPUTS[`[${'#'.repeat(padWidth)}]`] = pad(segmentNo, padWidth)
 
     const re = new RegExp(Object.keys(INPUTS).join('|'), 'gi')
-    let path = this.header.output.texture.path
+    let path = this.manifest.texture.path
     Object.keys(INPUTS).forEach((key) => {
       path = path.replace(key, INPUTS[key])
     })
@@ -187,24 +188,24 @@ export default class Player {
   }
 
   get GeometryFrameCount(): number {
-    if (!this.header || !this.geometryTarget) return 0
-    return this.header.output.geometry.targets[this.geometryTarget].frameCount
+    if (!this.manifest || !this.geometryTarget) return 0
+    return this.manifest.geometry.targets[this.geometryTarget].frameCount
   }
 
   get BatchSize(): number {
-    if (!this.header || !this.textureTarget) return 0
-    return this.header.output.texture.targets[this.textureTarget].sequenceSize
+    if (!this.manifest || !this.textureTarget) return 0
+    return this.manifest.texture.targets[this.textureTarget].sequenceSize
   }
 
   get TextureSegmentCount(): number {
-    if (!this.header || !this.textureTarget) return 0
-    return this.header.output.texture.targets[this.textureTarget].sequenceCount
+    if (!this.manifest || !this.textureTarget) return 0
+    return this.manifest.texture.targets[this.textureTarget].sequenceCount
   }
 
-  playTrack = (_fileHeader: V2FileHeader, _bufferDuration?: number, _intervalDuration?: number) => {
-    this.header = _fileHeader
-    this.geometryTarget = Object.keys(this.header.output.geometry.targets)[0]
-    this.textureTarget = Object.keys(this.header.output.texture.targets)[0]
+  playTrack = (_manifest: V2Schema, _bufferDuration?: number, _intervalDuration?: number) => {
+    this.manifest = _manifest
+    this.geometryTarget = Object.keys(this.manifest.geometry.targets)[0]
+    this.textureTarget = Object.keys(this.manifest.texture.targets)[0]
 
     if (_bufferDuration) {
       this.bufferDuration = _bufferDuration
@@ -259,18 +260,18 @@ export default class Player {
     const promises = []
 
     // number of frames for 1 second
-    const geometryBufferSize = this.header.output.geometry.targets[this.geometryTarget].frameRate
+    const geometryBufferSize = this.manifest.geometry.targets[this.geometryTarget].frameRate
     const currentGeometryFrame = getCurrentFrame(
-      this.header.output.geometry.targets[this.geometryTarget],
+      this.manifest.geometry.targets[this.geometryTarget],
       this.currentTime
     )
 
     // number of segments for 1 second
     const textureBufferSize = Math.ceil(
-      this.header.output.texture.targets[this.textureTarget].frameRate / this.BatchSize
+      this.manifest.texture.targets[this.textureTarget].frameRate / this.BatchSize
     )
     const currentTextureFrame = getCurrentFrame(
-      this.header.output.texture.targets[this.textureTarget],
+      this.manifest.texture.targets[this.textureTarget],
       this.currentTime
     )
     const currentTextureSegment = Math.floor(currentTextureFrame / this.BatchSize)
@@ -357,11 +358,11 @@ export default class Player {
   }
 
   processFrame = () => {
-    if (!this.header) {
+    if (!this.manifest) {
       return
     }
 
-    const gFrameRate = this.header.output.geometry.targets[this.geometryTarget].frameRate
+    const gFrameRate = this.manifest.geometry.targets[this.geometryTarget].frameRate
 
     if (this.AudioURL && this.audio.ended) {
       clearInterval(this.intervalId)
@@ -387,11 +388,11 @@ export default class Player {
     }
 
     const currentGeometryFrame = getCurrentFrame(
-      this.header.output.geometry.targets[this.geometryTarget],
+      this.manifest.geometry.targets[this.geometryTarget],
       this.currentTime
     )
     const currentTextureFrame = getCurrentFrame(
-      this.header.output.texture.targets[this.textureTarget],
+      this.manifest.texture.targets[this.textureTarget],
       this.currentTime
     )
     const currentTextureSegment = Math.floor(currentTextureFrame / this.BatchSize)
@@ -501,16 +502,16 @@ export default class Player {
   }
 
   update = () => {
-    if (!this.header) {
+    if (!this.manifest) {
       return
     }
     this.processFrame()
     const currentGeometryFrame = getCurrentFrame(
-      this.header.output.geometry.targets[this.geometryTarget],
+      this.manifest.geometry.targets[this.geometryTarget],
       this.currentTime
     )
     const currentTextureFrame = getCurrentFrame(
-      this.header.output.texture.targets[this.textureTarget],
+      this.manifest.texture.targets[this.textureTarget],
       this.currentTime
     )
     const currentTextureSegment = Math.floor(currentTextureFrame / this.BatchSize)

@@ -10,7 +10,7 @@ import {
   WebGLRenderer
 } from 'three'
 
-import { onFrameShowCallback, onMeshBufferingCallback, onTrackEndCallback, V1FileHeader } from '../Interfaces'
+import { onFrameShowCallback, onMeshBufferingCallback, onTrackEndCallback, V1Schema } from '../Interfaces'
 
 export type PlayerConstructorArgs = {
   renderer: WebGLRenderer
@@ -59,7 +59,7 @@ export default class Player {
   private onMeshBuffering: onMeshBufferingCallback | null = null
   private onFrameShow: onFrameShowCallback | null = null
   private onTrackEnd: onTrackEndCallback | null = null
-  fileHeader: V1FileHeader
+  manifest: V1Schema
   tempBufferObject: BufferGeometry
 
   private videoCtx: CanvasRenderingContext2D
@@ -79,7 +79,7 @@ export default class Player {
   }
 
   get numberOfFrames() {
-    return this.fileHeader?.frameData.length || 0
+    return this.manifest?.frameData.length || 0
   }
 
   constructor({
@@ -118,8 +118,8 @@ export default class Player {
 
     const handleVideoFrame = (now, metadata) => {
       this._video.requestVideoFrameCallback(handleVideoFrame)
-      if (!this.useVideoRequestCallback || !this.fileHeader) return
-      const frameToPlay = Math.round(metadata.mediaTime * this.fileHeader.frameRate)
+      if (!this.useVideoRequestCallback || !this.manifest) return
+      const frameToPlay = Math.round(metadata.mediaTime * this.manifest.frameRate)
       this.processFrame(frameToPlay)
     }
 
@@ -175,8 +175,8 @@ export default class Player {
     this.startedVideo = false
   }
 
-  playTrack = (_fileHeader: V1FileHeader, _targetFramesToRequest, _manifestFilePath) => {
-    this.fileHeader = _fileHeader
+  playTrack = (_manifest: V1Schema, _targetFramesToRequest, _manifestFilePath) => {
+    this.manifest = _manifest
     this.manifestFilePath = _manifestFilePath
 
     for (const buffer of this.meshBuffer.values()) buffer?.dispose()
@@ -349,7 +349,7 @@ export default class Player {
         targetFramesToRequest: this.targetFramesToRequest,
         meshFilePath,
         numberOfFrames: this.numberOfFrames,
-        fileHeader: this.fileHeader
+        fileHeader: this.manifest
       }
     }) // Send data to our worker.
   }
@@ -366,7 +366,7 @@ export default class Player {
 
   update() {
     this.bufferLoop()
-    if (!this.fileHeader || this.useVideoRequestCallback || this.video.paused) return
+    if (!this.manifest || this.useVideoRequestCallback || this.video.paused) return
     const frame = this.drawVideoAndGetCurrentFrameNumber()
     this.processFrame(frame)
   }

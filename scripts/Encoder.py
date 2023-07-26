@@ -309,18 +309,22 @@ def main():
     )
 
     manifestData = {
-        "Version": "v2",
-        "DRCURLPattern": os.path.relpath(
-            config["DRACOFilesPath"], config["OutputDirectory"]
-        ),
-        "KTX2URLPattern": os.path.relpath(
-            config["KTX2FilesPath"], config["OutputDirectory"]
-        ),
-        "BatchSize": config["KTX2_BATCH_SIZE"],
-        "GeometryFrameCount": geometry_frame_count,
-        "TextureSegmentCount": texture_segment_count,
-        "GeometryFrameRate": config["GEOMETRY_FRAME_RATE"],
-        "TextureFrameRate": config["TEXTURE_FRAME_RATE"],
+        "version": "v2",
+        "geometry": {
+            "format": "draco",
+            "frameRate": config["GEOMETRY_FRAME_RATE"],
+            "frameCount": geometry_frame_count,
+            "path": os.path.relpath(config["DRACOFilesPath"], config["OutputDirectory"]),
+        },
+        "texture": {
+            "targets": [{
+                "format": "ktx2",
+                "frameRate": config["TEXTURE_FRAME_RATE"],
+                "sequenceCount": texture_segment_count,
+                "sequenceSize": config["KTX2_BATCH_SIZE"],
+                "path": os.path.relpath(config["KTX2FilesPath"], config["OutputDirectory"]),
+            }],
+        }
     }
 
     # if audio duration is compatible with frames and frame rates
@@ -343,15 +347,15 @@ def main():
             else:
                 exit(1)
 
-        manifestData["AudioURL"] = config["AudioPath"]
+        manifestData["audio"] = {
+            "format": "mp3",
+            "path": config["AudioPath"]
+        }
     else:
         print("💡 Audio file not supplied, Skipping duration check...")
 
-    if config.get("AudioURL", None):
-        manifestData["AudioURL"] = config["AudioPath"]
-
     manifest_path = os.path.join(
-        config["OutputDirectory"], config["name"] + ".manifest"
+        config["OutputDirectory"], "uvol.json"
     )
 
     with open(manifest_path, "w") as f:

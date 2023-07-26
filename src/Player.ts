@@ -1,13 +1,13 @@
 import { Mesh, MeshBasicMaterial, PlaneGeometry, WebGLRenderer } from 'three'
 
 import {
-  FileHeader,
+  UVOLManifestSchema,
   onFrameShowCallback,
   onMeshBufferingCallback,
   onTrackEndCallback,
   PlayMode,
-  V1FileHeader,
-  V2FileHeader
+  V1Schema,
+  V2Schema
 } from './Interfaces'
 import V1Player from './V1/player'
 import V2Player from './V2/player'
@@ -70,7 +70,7 @@ export default class Player {
   private paths: Array<string> | null
   private renderer: WebGLRenderer
   private playMode: PlayMode
-  private header: FileHeader
+  private manifest: UVOLManifestSchema
   private v1Instance: V1Player = null
   private v2Instance: V2Player = null
   private worker: Worker
@@ -91,7 +91,7 @@ export default class Player {
     this.onTrackEnd = props.onTrackEnd ? () => {
       this.paused = true
       this.stopped = true
-      this.header = null
+      this.manifest = null
       props.onTrackEnd()
     } : this.setTrackPath
     this.video = props.video
@@ -125,14 +125,14 @@ export default class Player {
   }
 
   get isV2() {
-    if ('version' in this.header && this.header.version == 'v2') {
+    if ('version' in this.manifest && this.manifest.version == 'v2') {
       return true
     }
     return false
   }
 
   public setTrackPath = (_nextPath?: string) => {
-    this.header = null
+    this.manifest = null
     if (typeof _nextPath === 'undefined') {
       let nextTrack = null
       if (typeof this.currentTrack === 'undefined') {
@@ -159,7 +159,7 @@ export default class Player {
     fetch(_nextPath)
       .then((response) => response.json())
       .then((json) => {
-        this.header = json
+        this.manifest = json
         this.currentManifestPath = _nextPath
         if (this.isV2) {
           if (!this.v2Instance) {
@@ -204,7 +204,7 @@ export default class Player {
   }
 
   pause() {
-    if (!this.header)
+    if (!this.manifest)
       return
     if (this.isV2) {
       this.v2Instance.pause()
@@ -216,7 +216,7 @@ export default class Player {
   }
 
   play() {
-    if (!this.header)
+    if (!this.manifest)
       return
     if (this.isV2) {
       this.v2Instance.play()
@@ -229,16 +229,16 @@ export default class Player {
 
   playTrack() {
     if (this.isV2) {
-      this.v2Instance.playTrack(this.header as V2FileHeader, this.bufferDuration, this.intervalDuration)
+      this.v2Instance.playTrack(this.manifest as V2Schema, this.bufferDuration, this.intervalDuration)
     } else {
-      this.v1Instance.playTrack(this.header as V1FileHeader, this.targetFramesToRequest, this.currentManifestPath)
+      this.v1Instance.playTrack(this.manifest as V1Schema, this.targetFramesToRequest, this.currentManifestPath)
     }
     this.paused = false
     this.stopped = false
   }
 
   update() {
-    if (!this.header) {
+    if (!this.manifest) {
       return
     }
     if (this.isV2) {
