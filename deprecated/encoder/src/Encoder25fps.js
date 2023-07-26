@@ -16,12 +16,10 @@
 
 import glob from 'glob';
 import fs from 'fs';
-import THREE from 'three';
-import "./libs/THREECORTOLoader.js"
+import * as THREE from 'three';
+import {CORTOLoader} from "./libs/THREECORTOLoader.js"
 import CortoDecoder from './libs/cortodecoder.js';
 import HttpRequest from 'xmlhttprequest';
-
-const { CORTOLoader } = THREE;
 
 global.XMLHttpRequest = HttpRequest.XMLHttpRequest;
 

@@ -1,5 +1,3 @@
-import THREE from 'three';
-
 /*
 Corto
 
@@ -17,9 +15,9 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  You should have received
 a copy of the GNU General Public License along with Corto.
 If not, see <http://www.gnu.org/licenses/>.
 */
+import * as THREE from "three";
 
-
-THREE.CORTOLoader = function(options, manager) {
+const CORTOLoader = function(options, manager) {
 	this.manager = (manager !== undefined) ? manager : THREE.DefaultLoadingManager;
 
 	if(!options)
@@ -29,7 +27,7 @@ THREE.CORTOLoader = function(options, manager) {
 };
 
 
-THREE.CORTOLoader.prototype = {
+CORTOLoader.prototype = {
 
 	constructor: THREE.CORTOLoader,
 
@@ -156,3 +154,5 @@ THREE.CORTOLoader.prototype = {
 		}
 	}
 };
+
+export {CORTOLoader}
