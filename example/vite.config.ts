@@ -8,7 +8,7 @@ export default defineConfig({
     // mkcert()
   ],
   optimizeDeps: {
-    exclude: ['universal-volumetric']
+    exclude: ['@etherealengine/volumetric']
   },
   server: {
     fs: { allow: ['..'] },

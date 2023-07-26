@@ -6,7 +6,7 @@ import VolumetricPlayer from './VolumetricPlayer'
 
 function App() {
   const [playerVisible, setPlayerVisible] = useState(false)
-  const paths = ['/liam.manifest']
+  const paths = ['/liam.uvol.json']
   return (
     <div className="App">
       <button className={'button player-toggle'} onClick={() => setPlayerVisible(!playerVisible)}>

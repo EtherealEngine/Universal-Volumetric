@@ -10,7 +10,7 @@ import {
   WebGLRendererParameters
 } from 'three'
 import { OrbitControls } from 'three-stdlib'
-import Player from 'universal-volumetric/dist/Player'
+import Player from '@etherealengine/volumetric/dist/Player'
 import Stats from 'stats.js'
 import { PlayMode } from '../../dist/Interfaces'
 
