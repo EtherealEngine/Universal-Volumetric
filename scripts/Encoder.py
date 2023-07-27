@@ -166,7 +166,7 @@ def main():
   "draco_encoder": "", // path to draco_encoder binary
   "basisu": "", // path to draco_encoder binary
   "ABCFilePath": "",
-  "OBJFilesPath": "", // pattern with hashes. eg: OBJ/frame_###.obj
+  "OBJFilesPath": "", // pattern with hashes. eg: OBJ/frame_[#####].obj
   "DRACOFilesPath": "", // pattern with hashes
   "Q_POSITION_ATTR": 11, // quantization bits for the position attribute, default=11.
   "Q_TEXTURE_ATTR": 10, // quantization bits for the texture coordinate attribute, default=10.
@@ -238,7 +238,7 @@ def main():
                 bpy.ops.export_scene.obj(filepath=output_path, use_selection=True)
 
         config["OBJFilesPath"] = os.path.join(
-            config["OutputDirectory"], "OBJ", "frame_#######.obj"
+            config["OutputDirectory"], "OBJ", "frame_[#######].obj"
         )
 
     if config.get("OBJFilesPath", None):
@@ -298,7 +298,7 @@ def main():
                 exit(1)
 
         config["KTX2FilesPath"] = os.path.join(
-            config["OutputDirectory"], "KTX2", "texture_#######.ktx2"
+            config["OutputDirectory"], "KTX2", "texture_[#######].ktx2"
         )
 
     if config["KTX2FilesPath"]:
