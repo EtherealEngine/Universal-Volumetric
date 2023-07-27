@@ -7,7 +7,8 @@ import {
   sRGBEncoding,
   Texture,
   Uint16BufferAttribute,
-  WebGLRenderer
+  WebGLRenderer,
+  Color
 } from 'three'
 
 import { onFrameShowCallback, onMeshBufferingCallback, onTrackEndCallback, V1Schema } from '../Interfaces'
@@ -109,7 +110,7 @@ export default class Player {
     this._worker = worker ? worker : new Worker(Player.defaultWorkerURL, { type: 'module', name: 'UVOL' }) // spawn new worker;
     this._worker.onerror = console.error
 
-    this.material = new MeshBasicMaterial({ color: 0xffffff })
+    this.material = new MeshBasicMaterial({ color: new Color(0xffffff) })
     this.onTrackEnd = onTrackEnd
     this.targetFramesToRequest = targetFramesToRequest
 

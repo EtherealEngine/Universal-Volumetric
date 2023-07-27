@@ -52,7 +52,6 @@ export default class Player {
 
   // Public Fields
   public video: HTMLVideoElement
-  public mesh: Mesh
   /** When track is being played and paused somewhere, paused:true, stopped:false
    * When track is finished or no tracks are available, paused: true, stopped:true
    */
@@ -67,6 +66,7 @@ export default class Player {
   private onTrackEnd: onTrackEndCallback | null = null
 
   // Player data
+  private _mesh: Mesh
   private paths: Array<string> | null
   private renderer: WebGLRenderer
   private playMode: PlayMode
@@ -118,7 +118,7 @@ export default class Player {
     this.currentTrack = undefined
     this.v1Instance = null
     this.v2Instance = null
-    this.mesh = new Mesh(new PlaneGeometry(0.00001, 0.00001), new MeshBasicMaterial({ color: 0xffffff }))
+    this._mesh = new Mesh(new PlaneGeometry(0.00001, 0.00001), new MeshBasicMaterial({ color: 0xffffff }))
 
     this.paused = true
     this.stopped = true
@@ -167,7 +167,7 @@ export default class Player {
               renderer: this.renderer,
               onMeshBuffering: this.onMeshBuffering,
               onFrameShow: this.onFrameShow,
-              mesh: this.mesh,
+              mesh: this._mesh,
               onTrackEnd: this.onTrackEnd,
               audio: this.video as HTMLAudioElement
             })
@@ -183,7 +183,7 @@ export default class Player {
 
             this.v1Instance = new V1Player({
               renderer: this.renderer,
-              mesh: this.mesh,
+              mesh: this._mesh,
               encoderWindowSize: this.encoderWindowSize,
               encoderByteLength: this.encoderByteLength,
               videoSize: this.videoSize,
@@ -246,6 +246,12 @@ export default class Player {
     } else {
       this.v1Instance.update()
     }
+  }
+
+  get mesh(): Mesh {
+    if (!this.manifest) return this._mesh
+    if (this.isV2) return this.v2Instance.mesh
+    return this.v1Instance.mesh
   }
 
   dispose() {

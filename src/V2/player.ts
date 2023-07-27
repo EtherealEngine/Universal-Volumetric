@@ -7,7 +7,8 @@ import {
   MeshBasicMaterial,
   ShaderChunk,
   ShaderMaterial,
-  WebGLRenderer
+  WebGLRenderer,
+  Color
 } from 'three'
 
 import { onFrameShowCallback, onMeshBufferingCallback, onTrackEndCallback, V2Schema } from '../Interfaces'
@@ -134,7 +135,7 @@ export default class Player {
         ${ShaderChunk.logdepthbuf_fragment}
     }`
 
-    this.failMaterial = new MeshBasicMaterial({ color: 0xffffff })
+    this.failMaterial = new MeshBasicMaterial({ color: new Color(0xffffff) })
   }
 
   get AudioURL(): string {
