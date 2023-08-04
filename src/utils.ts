@@ -23,10 +23,20 @@ export function countHashChar(URL: string) {
   return count
 }
 
-export function isTextureFormatSupported(renderer: WebGLRenderer, format: TextureFileFormat): boolean {
+export function isTextureFormatSupported(renderer: WebGLRenderer, format: TextureFileFormat) {
   if (format == 'ktx2' || format == 'mp4') {
     return true
   } else if (format == 'etc2') {
     return renderer.extensions.has('WEBGL_compressed_texture_etc')
   }
+}
+
+export function getAbsoluteURL(url: string, newSegment: string) {
+  const urlObj = new URL(url);
+  const pathSegments = urlObj.pathname.split('/');
+  pathSegments.pop(); // Remove the last segment (test.txt)
+  pathSegments.push(newSegment); // Add the new segment (ABC/another.txt)
+  urlObj.pathname = pathSegments.join('/');
+
+  return urlObj.href;
 }

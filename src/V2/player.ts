@@ -24,7 +24,7 @@ import {
 } from '../Interfaces'
 import { DRACOLoader } from '../lib/DRACOLoader'
 import { KTX2Loader } from '../lib/KTX2Loader'
-import { countHashChar, isTextureFormatSupported, pad } from '../utils'
+import { countHashChar, isTextureFormatSupported, pad, getAbsoluteURL } from '../utils'
 
 export interface fetchBuffersCallback {
   (): void
@@ -63,6 +63,7 @@ export default class Player {
   private isClockPaused: boolean
 
   // Private Fields
+  private manifestFilePath: string
   private currentTime: number = 0
   private meshMap: Map<number, BufferGeometry> = new Map()
   private textureMap: Map<number, CompressedArrayTexture> = new Map()
@@ -151,7 +152,7 @@ export default class Player {
     Object.keys(INPUTS).forEach((key) => {
       path = path.replace(key, INPUTS[key])
     })
-    return path
+    return getAbsoluteURL(this.manifestFilePath, path)
   }
 
   private getTextureURL = (segmentNo: number) => {
@@ -169,7 +170,7 @@ export default class Player {
     Object.keys(INPUTS).forEach((key) => {
       path = path.replace(key, INPUTS[key])
     })
-    return path
+    return getAbsoluteURL(this.manifestFilePath, path)
   }
 
   get paused(): boolean {
@@ -195,9 +196,10 @@ export default class Player {
     return this.manifest.texture.targets[this.textureTarget].sequenceCount
   }
 
-  playTrack = (_manifest: V2Schema, _bufferDuration?: number, _intervalDuration?: number) => {
+  playTrack = (_manifest: V2Schema, _manifestFilePath: string, _bufferDuration?: number, _intervalDuration?: number) => {
     console.log(_manifest)
     this.manifest = _manifest
+    this.manifestFilePath = _manifestFilePath
     this.geometryTarget = Object.keys(this.manifest.geometry.targets)[0]
     this.textureTarget = Object.keys(this.manifest.texture.targets)[0]
 

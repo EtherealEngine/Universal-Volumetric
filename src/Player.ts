@@ -229,7 +229,7 @@ export default class Player {
 
   playTrack() {
     if (this.isV2) {
-      this.v2Instance.playTrack(this.manifest as V2Schema, this.bufferDuration, this.intervalDuration)
+      this.v2Instance.playTrack(this.manifest as V2Schema, this.currentManifestPath, this.bufferDuration, this.intervalDuration)
     } else {
       this.v1Instance.playTrack(this.manifest as V1Schema, this.targetFramesToRequest, this.currentManifestPath)
     }
