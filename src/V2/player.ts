@@ -1,20 +1,30 @@
 import {
   BufferGeometry,
+  Color,
   CompressedArrayTexture,
+  CompressedTexture,
   GLSL3,
   Material,
   Mesh,
   MeshBasicMaterial,
   ShaderChunk,
   ShaderMaterial,
+  UnsignedByteType,
   WebGLRenderer,
-  Color
+  RGB_ETC2_Format
 } from 'three'
 
 import { onFrameShowCallback, onMeshBufferingCallback, onTrackEndCallback, V2Schema } from '../Interfaces'
-import { FORMATS_TO_EXT, GeometryTarget, KTX2TextureTarget } from '../Interfaces'
+import {
+  FORMATS_TO_EXT,
+  GeometryTarget,
+  KTX2TextureTarget,
+  TEXTURE_FORMAT_PRIORITY,
+  TextureFileFormat
+} from '../Interfaces'
 import { DRACOLoader } from '../lib/DRACOLoader'
 import { KTX2Loader } from '../lib/KTX2Loader'
+import { countHashChar, isTextureFormatSupported, pad } from '../utils'
 
 export interface fetchBuffersCallback {
   (): void
@@ -34,27 +44,6 @@ function getCurrentFrame(targetData: GeometryTarget | KTX2TextureTarget, current
   return Math.round(targetData.frameRate * currentTime)
 }
 
-/**
- * Utility function to pad 'n' with 'width' number of '0' characters.
- * This is used when expanding URLs, which are filled with '#'
- * For example: frame_#### is expanded to frame_0000, frame_0010, frame_0100 etc...
- */
-function pad(n: number, width: number) {
-  const padChar = '0'
-  let paddedN = n.toString()
-  return paddedN.length >= width ? paddedN : new Array(width - paddedN.length + 1).join(padChar) + paddedN
-}
-
-function countHashChar(URL: string) {
-  let count = 0
-  for (let i = 0; i < URL.length; i++) {
-    if (URL[i] === '#') {
-      count++
-    }
-  }
-  return count
-}
-
 export default class Player {
   // Public Fields
   public renderer: WebGLRenderer
@@ -67,6 +56,7 @@ export default class Player {
   private dracoLoader: DRACOLoader
   private failMaterial: Material | null = null
   private shaderMaterial: ShaderMaterial // to reuse this material
+  private compressedTexture: boolean
   private startTime: number // in milliseconds
   private pausedTime: number
   private totalPausedDuration: number
@@ -113,34 +103,36 @@ export default class Player {
     this.audio = audio ? audio : (document.createElement('audio') as HTMLAudioElement)
 
     this.vertexShader = `${ShaderChunk.common}
-    ${ShaderChunk.logdepthbuf_pars_vertex}
-    uniform vec2 size;
-    out vec2 vUv;
-    
-    void main() {
-        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-        vUv = uv;
-        ${ShaderChunk.logdepthbuf_vertex}
-    }`
+	  ${ShaderChunk.logdepthbuf_pars_vertex}
+	  uniform vec2 size;
+	  out vec2 vUv;
+	  
+	  void main() {
+		  gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+		  vUv = uv;
+		  ${ShaderChunk.logdepthbuf_vertex}
+	  }`
     this.fragmentShader = `${ShaderChunk.logdepthbuf_pars_fragment}
-    precision highp sampler2DArray;
-    uniform sampler2DArray diffuse;
-    in vec2 vUv;
-    uniform int depth;
-    out vec4 outColor;
-    
-    void main() {
-        vec4 color = texture2D( diffuse, vec3( vUv, depth ) );
-        outColor = LinearTosRGB(color);
-        ${ShaderChunk.logdepthbuf_fragment}
-    }`
+	  precision highp sampler2DArray;
+	  uniform sampler2DArray diffuse;
+	  in vec2 vUv;
+	  uniform int depth;
+	  out vec4 outColor;
+	  
+	  void main() {
+		  vec4 color = texture2D( diffuse, vec3( vUv, depth ) );
+		  outColor = LinearTosRGB(color);
+		  ${ShaderChunk.logdepthbuf_fragment}
+	  }`
 
-    this.failMaterial = new MeshBasicMaterial({ color: new Color(0xffffff) })
+    this.failMaterial = new MeshBasicMaterial({ color: new Color(0x000000) })
   }
 
   get AudioURL(): string {
     if (!this.manifest || !this.manifest.audio) return null
-    const format = Array.isArray(this.manifest.audio.format) ? this.manifest.audio.format[0] : this.manifest.audio.format
+    const format = Array.isArray(this.manifest.audio.format)
+      ? this.manifest.audio.format[0]
+      : this.manifest.audio.format
     const path = this.manifest.audio.path.replace('[ext]', FORMATS_TO_EXT[format])
     return path
   }
@@ -154,6 +146,7 @@ export default class Player {
       '[ext]': FORMATS_TO_EXT[targetData.format]
     }
     INPUTS[`[${'#'.repeat(padWidth)}]`] = pad(frameNo, padWidth)
+
     let path = this.manifest.geometry.path
     Object.keys(INPUTS).forEach((key) => {
       path = path.replace(key, INPUTS[key])
@@ -172,7 +165,6 @@ export default class Player {
     }
     INPUTS[`[${'#'.repeat(padWidth)}]`] = pad(segmentNo, padWidth)
 
-    const re = new RegExp(Object.keys(INPUTS).join('|'), 'gi')
     let path = this.manifest.texture.path
     Object.keys(INPUTS).forEach((key) => {
       path = path.replace(key, INPUTS[key])
@@ -204,9 +196,26 @@ export default class Player {
   }
 
   playTrack = (_manifest: V2Schema, _bufferDuration?: number, _intervalDuration?: number) => {
+    console.log(_manifest)
     this.manifest = _manifest
     this.geometryTarget = Object.keys(this.manifest.geometry.targets)[0]
     this.textureTarget = Object.keys(this.manifest.texture.targets)[0]
+
+    const textureTargets = Object.keys(this.manifest.texture.targets)
+    textureTargets.sort((a, b) => {
+      return (
+        TEXTURE_FORMAT_PRIORITY[this.manifest.texture.targets[b].format] -
+        TEXTURE_FORMAT_PRIORITY[this.manifest.texture.targets[a].format]
+      )
+    })
+    console.log(textureTargets)
+    for (let i = 0; i < textureTargets.length; i++) {
+      if (isTextureFormatSupported(this.renderer, textureTargets[i] as TextureFileFormat)) {
+        console.log('Choosing ', textureTargets[i])
+        this.textureTarget = textureTargets[i] as TextureFileFormat
+        break
+      }
+    }
 
     if (_bufferDuration) {
       this.bufferDuration = _bufferDuration
@@ -225,7 +234,7 @@ export default class Player {
     this.lastRequestedTextureSegment = -1
 
     this.totalPausedDuration = 0
-    this.isClockPaused = false
+    this.isClockPaused = true
     this.pausedTime = 0
     this.currentTime = 0
 
@@ -235,7 +244,6 @@ export default class Player {
      * If bufferDuration is large, intervalDuration should be large as well to allow transcoding textures.
      */
     this.fetchBuffers(this.startVideo) /** Fetch initial buffers, and the start video */
-
 
     //@ts-ignore
     this.intervalId = setInterval(() => {
@@ -262,19 +270,11 @@ export default class Player {
 
     // number of frames for 1 second
     const geometryBufferSize = this.manifest.geometry.targets[this.geometryTarget].frameRate
-    const currentGeometryFrame = getCurrentFrame(
-      this.manifest.geometry.targets[this.geometryTarget],
-      this.currentTime
-    )
+    const currentGeometryFrame = getCurrentFrame(this.manifest.geometry.targets[this.geometryTarget], this.currentTime)
 
     // number of segments for 1 second
-    const textureBufferSize = Math.ceil(
-      this.manifest.texture.targets[this.textureTarget].frameRate / this.BatchSize
-    )
-    const currentTextureFrame = getCurrentFrame(
-      this.manifest.texture.targets[this.textureTarget],
-      this.currentTime
-    )
+    const textureBufferSize = Math.ceil(this.manifest.texture.targets[this.textureTarget].frameRate / this.BatchSize)
+    const currentTextureFrame = getCurrentFrame(this.manifest.texture.targets[this.textureTarget], this.currentTime)
     const currentTextureSegment = Math.floor(currentTextureFrame / this.BatchSize)
 
     for (let i = 0; i < this.bufferDuration; i++) {
@@ -291,6 +291,7 @@ export default class Player {
         this.lastRequestedGeometryFrame = currentRequestEnd
         for (; currentRequestingFrame <= this.lastRequestedGeometryFrame; currentRequestingFrame++) {
           const dracoURL = this.getGeometryURL(currentRequestingFrame)
+          // console.log('fetching draco:', currentRequestingFrame)
           promises.push(this.decodeDraco(dracoURL, currentRequestingFrame))
         }
       }
@@ -308,7 +309,8 @@ export default class Player {
         this.lastRequestedTextureSegment = currentRequestEnd
         for (; currentRequestingTextureSegment <= this.lastRequestedTextureSegment; currentRequestingTextureSegment++) {
           const textureURL = this.getTextureURL(currentRequestingTextureSegment)
-          promises.push(this.decodeKTX2(textureURL, currentRequestingTextureSegment))
+          // console.log('fetching texture:', currentRequestingTextureSegment)
+          promises.push(this.decodeTexture(textureURL, currentRequestingTextureSegment))
         }
       }
     }
@@ -324,9 +326,37 @@ export default class Player {
     return new Promise((resolve, reject) => {
       this.dracoLoader.load(dracoURL, (geometry: BufferGeometry) => {
         this.meshMap.set(frameNo, geometry)
+        console.log('decoded draco: ', frameNo)
         resolve(true)
       })
     })
+  }
+
+  decodeTexture = (textureURL: string, segmentNo: number) => {
+    const format = this.manifest.texture.targets[this.textureTarget].format
+    console.log(format)
+    if (format == 'ktx2') {
+      return this.decodeKTX2(textureURL, segmentNo)
+    } else if (format == 'etc2') {
+      return new Promise((resolve, reject) => {
+        fetch(textureURL)
+          .then((res) => res.arrayBuffer())
+          .then((arrayBuffer) => {
+            const mipmapData = new Uint8Array(arrayBuffer)
+            const mipmaps = [
+              {
+                data: mipmapData,
+                width: this.manifest.texture.targets[this.textureTarget].resolution[0],
+                height: this.manifest.texture.targets[this.textureTarget].resolution[1]
+              }
+            ]
+            // @ts-ignore
+            this.textureMap.set(segmentNo, mipmaps)
+            console.log('decoded etc2: ', segmentNo)
+            resolve(true)
+          })
+      })
+    }
   }
 
   decodeKTX2 = (textureURL: string, segmentNo: number) => {
@@ -388,19 +418,14 @@ export default class Player {
       this.currentTime = currentTimeMS / 1000
     }
 
-    const currentGeometryFrame = getCurrentFrame(
-      this.manifest.geometry.targets[this.geometryTarget],
-      this.currentTime
-    )
-    const currentTextureFrame = getCurrentFrame(
-      this.manifest.texture.targets[this.textureTarget],
-      this.currentTime
-    )
+    const currentGeometryFrame = getCurrentFrame(this.manifest.geometry.targets[this.geometryTarget], this.currentTime)
+    const currentTextureFrame = getCurrentFrame(this.manifest.texture.targets[this.textureTarget], this.currentTime)
     const currentTextureSegment = Math.floor(currentTextureFrame / this.BatchSize)
 
     if (currentGeometryFrame >= this.GeometryFrameCount) {
       clearInterval(this.intervalId)
       this.dispose(false) // next track might be using this compiled shader, so dont dispose shader
+      console.log('Calling onEnd(): ', currentGeometryFrame, this.GeometryFrameCount)
       this.onTrackEnd()
       return
     }
@@ -412,6 +437,7 @@ export default class Player {
      */
 
     if (!this.meshMap.has(currentGeometryFrame)) {
+      console.log('geometry frame not found. skipping frame: ', currentGeometryFrame)
       return
     }
 
@@ -419,6 +445,7 @@ export default class Player {
       this.mesh.geometry = this.meshMap.get(currentGeometryFrame)
       this.mesh.material = this.failMaterial
       this.onFrameShow?.(currentGeometryFrame)
+      console.log(`TFrame: ${currentTextureSegment} not found. Applying failMaterial: `, Array.from(this.textureMap.keys()))
       return
     }
 
@@ -426,63 +453,88 @@ export default class Player {
 
     this.onFrameShow?.(currentGeometryFrame)
 
-    if (
-      offSet == 0 ||
-      // @ts-ignore
-      !this.mesh.material.isShaderMaterial ||
-      // @ts-ignore
-      this.mesh.material.name != currentTextureSegment
-    ) {
-      /**
-       * Either this is a new segment, hence we need to apply a new texture
-       * Or In the previous frame, we applied to failMaterial, so that current mesh.material is not a ShaderMaterial.
-       * Or Player skipped current segment's first frame hence it has old segment's ShaderMaterial
-       * In all the above cases, we need to apply new texture since we know we have one.
-       */
-
-      if ((this.mesh.material as ShaderMaterial).isShaderMaterial) {
-        // If we already have ShaderMaterial, just update uniforms
-        ;(this.mesh.material as ShaderMaterial).uniforms.diffuse.value = this.textureMap.get(currentTextureSegment)
-        ;(this.mesh.material as ShaderMaterial).uniforms.depth.value = offSet
-      } else if (this.shaderMaterial) {
-        /**
-         * Mesh doesn't have ShaderMaterial (probably it used failMaterial before)
-         * But we have cached shaderMaterial, update uniforms and use it.
-         */
-        this.shaderMaterial.uniforms.diffuse.value = this.textureMap.get(currentTextureSegment)
-        this.shaderMaterial.uniforms.depth.value = offSet
-        this.mesh.material = this.shaderMaterial
-      } else {
-        // We have nothing. Create material, Cache it and assign it.
-        this.shaderMaterial = new ShaderMaterial({
-          uniforms: {
-            diffuse: {
-              value: this.textureMap.get(currentTextureSegment)
-            },
-            depth: {
-              value: offSet
-            }
-          },
-          vertexShader: this.vertexShader,
-          fragmentShader: this.fragmentShader,
-          glslVersion: GLSL3
-        })
-        this.mesh.material = this.shaderMaterial
+    const format = this.manifest.texture.targets[this.textureTarget].format
+    const [width, height] = this.manifest.texture.targets[this.textureTarget].resolution
+    this.mesh.material = new MeshBasicMaterial({ color: new Color(0xffffff) })
+    console.log(currentGeometryFrame, currentTextureSegment, this.BatchSize, this.currentTime)
+    this.mesh.material.needsUpdate = true
+    if (format == 'etc2') {
+      if (!this.compressedTexture) {
+        console.log('applying red material')
+        this.mesh.material = new MeshBasicMaterial({ color: new Color(0xff0000) })
+        this.mesh.material.needsUpdate = true
+        this.compressedTexture = true
       }
-
-      // @ts-ignore
-      this.mesh.material.name = currentTextureSegment.toString()
-      // @ts-ignore
-      this.mesh.material.needsUpdate = true
       this.mesh.geometry = this.meshMap.get(currentGeometryFrame)
       this.mesh.geometry.attributes.position.needsUpdate = true
-    } else {
-      this.mesh.geometry = this.meshMap.get(currentGeometryFrame)
-      if (this.mesh.geometry) {
+
+      const mipmaps = this.textureMap.get(currentTextureSegment)
+      // @ts-ignore
+      const texture = new CompressedTexture(mipmaps, width, height, RGB_ETC2_Format, UnsignedByteType)
+      texture.needsUpdate = true
+      // @ts-ignore
+      this.mesh.material.map = texture
+      // @ts-ignore
+      this.mesh.material.needsUpdate = true
+    } else if (format == 'ktx2') {
+      if (
+        offSet == 0 ||
+        // @ts-ignore
+        !this.mesh.material.isShaderMaterial ||
+        // @ts-ignore
+        this.mesh.material.name != currentTextureSegment
+      ) {
+        /**
+         * Either this is a new segment, hence we need to apply a new texture
+         * Or In the previous frame, we applied to failMaterial, so that current mesh.material is not a ShaderMaterial.
+         * Or Player skipped current segment's first frame hence it has old segment's ShaderMaterial
+         * In all the above cases, we need to apply new texture since we know we have one.
+         */
+
+        if ((this.mesh.material as ShaderMaterial).isShaderMaterial) {
+          // If we already have ShaderMaterial, just update uniforms
+          ;(this.mesh.material as ShaderMaterial).uniforms.diffuse.value = this.textureMap.get(currentTextureSegment)
+          ;(this.mesh.material as ShaderMaterial).uniforms.depth.value = offSet
+        } else if (this.shaderMaterial) {
+          /**
+           * Mesh doesn't have ShaderMaterial (probably it used failMaterial before)
+           * But we have cached shaderMaterial, update uniforms and use it.
+           */
+          this.shaderMaterial.uniforms.diffuse.value = this.textureMap.get(currentTextureSegment)
+          this.shaderMaterial.uniforms.depth.value = offSet
+          this.mesh.material = this.shaderMaterial
+        } else {
+          // We have nothing. Create material, Cache it and assign it.
+          this.shaderMaterial = new ShaderMaterial({
+            uniforms: {
+              diffuse: {
+                value: this.textureMap.get(currentTextureSegment)
+              },
+              depth: {
+                value: offSet
+              }
+            },
+            vertexShader: this.vertexShader,
+            fragmentShader: this.fragmentShader,
+            glslVersion: GLSL3
+          })
+          this.mesh.material = this.shaderMaterial
+        }
+
+        // @ts-ignore
+        this.mesh.material.name = currentTextureSegment.toString()
+        // @ts-ignore
+        this.mesh.material.needsUpdate = true
+        this.mesh.geometry = this.meshMap.get(currentGeometryFrame)
         this.mesh.geometry.attributes.position.needsUpdate = true
+      } else {
+        this.mesh.geometry = this.meshMap.get(currentGeometryFrame)
+        if (this.mesh.geometry) {
+          this.mesh.geometry.attributes.position.needsUpdate = true
+        }
+        // updating texture within CompressedArrayTexture
+        ;(this.mesh.material as ShaderMaterial).uniforms['depth'].value = offSet
       }
-      // updating texture within CompressedArrayTexture
-      ;(this.mesh.material as ShaderMaterial).uniforms['depth'].value = offSet
     }
   }
 
@@ -495,7 +547,7 @@ export default class Player {
     }
 
     for (const [key, buffer] of this.textureMap.entries()) {
-      if (key < segmentNo) {
+      if (key < segmentNo && buffer.isCompressedArrayTexture) {
         buffer.dispose()
         this.textureMap.delete(key)
       }
@@ -507,16 +559,10 @@ export default class Player {
       return
     }
     this.processFrame()
-    const currentGeometryFrame = getCurrentFrame(
-      this.manifest.geometry.targets[this.geometryTarget],
-      this.currentTime
-    )
-    const currentTextureFrame = getCurrentFrame(
-      this.manifest.texture.targets[this.textureTarget],
-      this.currentTime
-    )
+    const currentGeometryFrame = getCurrentFrame(this.manifest.geometry.targets[this.geometryTarget], this.currentTime)
+    const currentTextureFrame = getCurrentFrame(this.manifest.texture.targets[this.textureTarget], this.currentTime)
     const currentTextureSegment = Math.floor(currentTextureFrame / this.BatchSize)
-    this.removePlayedBuffer(currentGeometryFrame - 5, currentTextureSegment - 1)
+    this.removePlayedBuffer(currentGeometryFrame - 5, currentTextureSegment - 5)
   }
 
   dispose(disposeShader = true): void {
@@ -533,7 +579,7 @@ export default class Player {
     if (this.textureMap) {
       for (let i = 0; i < this.textureMap.size; i++) {
         const buffer = this.textureMap.get(i)
-        if (buffer && buffer instanceof CompressedArrayTexture) {
+        if (buffer && buffer.isCompressedArrayTexture) {
           buffer.dispose()
         }
       }

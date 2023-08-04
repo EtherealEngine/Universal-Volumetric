@@ -16,7 +16,7 @@ export interface V1Schema {
 
 export type AudioFileFormat = 'mp3'
 export type GeometryFileFormat = 'obj' | 'draco'
-export type TextureFileFormat = 'mp4' | 'ktx2' // | 'astc.ktx' | 'etc1.ktx'
+export type TextureFileFormat = 'mp4' | 'ktx2' | 'etc2' // | 'astc.ktx' | 'etc1.ktx'
 
 export interface GeometryTarget {
   /**
@@ -58,7 +58,6 @@ export interface TextureTarget {
 }
 
 export interface KTX2TextureTarget extends TextureTarget {
-  "format": "ktx2",
   /**
    * The number of frames to encode in each KTX2 file
    */
@@ -157,5 +156,14 @@ export enum PlayMode {
 export const FORMATS_TO_EXT = {
   'mp3': '.mp3',
   'draco': '.drc',
-  'ktx2': '.ktx2'
+  'ktx2': '.ktx2',
+  'etc2': '.etc2'
+}
+
+
+// more value => more priority
+export const TEXTURE_FORMAT_PRIORITY = {
+  'ktx2': 0,
+  'etc2': 1, // if etc2 is supported
+  'etc1': 2, // if etc1 is supported
 }
