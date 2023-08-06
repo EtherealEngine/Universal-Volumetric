@@ -35,15 +35,9 @@ export function isTextureFormatSupported(renderer: WebGLRenderer, format: Textur
  * If the URL paths in UVOL2 manifest are relative, Create absolute path using manifest path.
  * If the URL paths are absolute, return them.
  */
-export function getAbsoluteURL(url: string, newSegment: string) {
-  if (newSegment.indexOf('http://') === 0 || newSegment.indexOf('https://') === 0) {
-    return newSegment
-  }
-  const urlObj = new URL(url)
-  const pathSegments = urlObj.pathname.split('/')
-  pathSegments.pop()
-  pathSegments.push(newSegment)
-  urlObj.pathname = pathSegments.join('/')
-
-  return urlObj.href
+export function getAbsoluteURL(manifestURL: string, newSegment: string) {
+  const manifestURLSegments = manifestURL.split('/')
+  manifestURLSegments.pop()
+  manifestURLSegments.push(newSegment)
+  return manifestURLSegments.join('/')
 }

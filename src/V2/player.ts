@@ -7,11 +7,11 @@ import {
   Material,
   Mesh,
   MeshBasicMaterial,
+  RGB_ETC2_Format,
   ShaderChunk,
   ShaderMaterial,
   UnsignedByteType,
-  WebGLRenderer,
-  RGB_ETC2_Format
+  WebGLRenderer
 } from 'three'
 
 import { onFrameShowCallback, onMeshBufferingCallback, onTrackEndCallback, V2Schema } from '../Interfaces'
@@ -24,7 +24,7 @@ import {
 } from '../Interfaces'
 import { DRACOLoader } from '../lib/DRACOLoader'
 import { KTX2Loader } from '../lib/KTX2Loader'
-import { countHashChar, isTextureFormatSupported, pad, getAbsoluteURL } from '../utils'
+import { countHashChar, getAbsoluteURL, isTextureFormatSupported, pad } from '../utils'
 
 export interface fetchBuffersCallback {
   (): void
@@ -196,8 +196,12 @@ export default class Player {
     return this.manifest.texture.targets[this.textureTarget].sequenceCount
   }
 
-  playTrack = (_manifest: V2Schema, _manifestFilePath: string, _bufferDuration?: number, _intervalDuration?: number) => {
-    console.log(_manifest)
+  playTrack = (
+    _manifest: V2Schema,
+    _manifestFilePath: string,
+    _bufferDuration?: number,
+    _intervalDuration?: number
+  ) => {
     this.manifest = _manifest
     this.manifestFilePath = _manifestFilePath
     this.geometryTarget = Object.keys(this.manifest.geometry.targets)[0]
@@ -210,10 +214,8 @@ export default class Player {
         TEXTURE_FORMAT_PRIORITY[this.manifest.texture.targets[a].format]
       )
     })
-    console.log(textureTargets)
     for (let i = 0; i < textureTargets.length; i++) {
       if (isTextureFormatSupported(this.renderer, textureTargets[i] as TextureFileFormat)) {
-        console.log('Choosing ', textureTargets[i])
         this.textureTarget = textureTargets[i] as TextureFileFormat
         break
       }
@@ -280,38 +282,34 @@ export default class Player {
     const currentTextureSegment = Math.floor(currentTextureFrame / this.BatchSize)
 
     for (let i = 0; i < this.bufferDuration; i++) {
+      const geometryRequestEnd = Math.min(
+        currentGeometryFrame + (i + 1) * geometryBufferSize,
+        this.GeometryFrameCount - 1
+      )
       if (
-        this.lastRequestedGeometryFrame - currentGeometryFrame < this.bufferDuration * geometryBufferSize &&
-        this.lastRequestedGeometryFrame != this.GeometryFrameCount - 1
+        this.lastRequestedGeometryFrame != this.GeometryFrameCount - 1 &&
+        this.lastRequestedGeometryFrame < geometryRequestEnd
       ) {
         let currentRequestingFrame = this.lastRequestedGeometryFrame + 1
-        const currentRequestEnd = Math.min(
-          currentGeometryFrame + (i + 1) * geometryBufferSize,
-          this.GeometryFrameCount - 1
-        )
-        if (currentRequestEnd < currentRequestingFrame) continue
-        this.lastRequestedGeometryFrame = currentRequestEnd
-        for (; currentRequestingFrame <= this.lastRequestedGeometryFrame; currentRequestingFrame++) {
+        this.lastRequestedGeometryFrame = geometryRequestEnd
+        for (; currentRequestingFrame <= geometryRequestEnd; currentRequestingFrame++) {
           const dracoURL = this.getGeometryURL(currentRequestingFrame)
-          // console.log('fetching draco:', currentRequestingFrame)
           promises.push(this.decodeDraco(dracoURL, currentRequestingFrame))
         }
       }
 
+      const textureRequestEnd = Math.min(
+        currentTextureSegment + (i + 1) * textureBufferSize,
+        this.TextureSegmentCount - 1
+      )
       if (
-        this.lastRequestedTextureSegment - currentTextureSegment < this.bufferDuration * textureBufferSize &&
-        this.lastRequestedTextureSegment != this.TextureSegmentCount - 1
+        this.lastRequestedTextureSegment != this.TextureSegmentCount - 1 &&
+        this.lastRequestedTextureSegment < textureRequestEnd
       ) {
         let currentRequestingTextureSegment = this.lastRequestedTextureSegment + 1
-        const currentRequestEnd = Math.min(
-          currentTextureSegment + (i + 1) * textureBufferSize,
-          this.TextureSegmentCount - 1
-        )
-        if (currentRequestEnd < currentRequestingTextureSegment) continue
-        this.lastRequestedTextureSegment = currentRequestEnd
+        this.lastRequestedTextureSegment = textureRequestEnd
         for (; currentRequestingTextureSegment <= this.lastRequestedTextureSegment; currentRequestingTextureSegment++) {
           const textureURL = this.getTextureURL(currentRequestingTextureSegment)
-          // console.log('fetching texture:', currentRequestingTextureSegment)
           promises.push(this.decodeTexture(textureURL, currentRequestingTextureSegment))
         }
       }
@@ -328,7 +326,6 @@ export default class Player {
     return new Promise((resolve, reject) => {
       this.dracoLoader.load(dracoURL, (geometry: BufferGeometry) => {
         this.meshMap.set(frameNo, geometry)
-        console.log('decoded draco: ', frameNo)
         resolve(true)
       })
     })
@@ -336,7 +333,6 @@ export default class Player {
 
   decodeTexture = (textureURL: string, segmentNo: number) => {
     const format = this.manifest.texture.targets[this.textureTarget].format
-    console.log(format)
     if (format == 'ktx2') {
       return this.decodeKTX2(textureURL, segmentNo)
     } else if (format == 'etc2') {
@@ -354,7 +350,6 @@ export default class Player {
             ]
             // @ts-ignore
             this.textureMap.set(segmentNo, mipmaps)
-            console.log('decoded etc2: ', segmentNo)
             resolve(true)
           })
       })
@@ -427,7 +422,6 @@ export default class Player {
     if (currentGeometryFrame >= this.GeometryFrameCount) {
       clearInterval(this.intervalId)
       this.dispose(false) // next track might be using this compiled shader, so dont dispose shader
-      console.log('Calling onEnd(): ', currentGeometryFrame, this.GeometryFrameCount)
       this.onTrackEnd()
       return
     }
@@ -439,7 +433,6 @@ export default class Player {
      */
 
     if (!this.meshMap.has(currentGeometryFrame)) {
-      console.log('geometry frame not found. skipping frame: ', currentGeometryFrame)
       return
     }
 
@@ -447,7 +440,6 @@ export default class Player {
       this.mesh.geometry = this.meshMap.get(currentGeometryFrame)
       this.mesh.material = this.failMaterial
       this.onFrameShow?.(currentGeometryFrame)
-      console.log(`TFrame: ${currentTextureSegment} not found. Applying failMaterial: `, Array.from(this.textureMap.keys()))
       return
     }
 
@@ -458,11 +450,9 @@ export default class Player {
     const format = this.manifest.texture.targets[this.textureTarget].format
     const [width, height] = this.manifest.texture.targets[this.textureTarget].resolution
     this.mesh.material = new MeshBasicMaterial({ color: new Color(0xffffff) })
-    console.log(currentGeometryFrame, currentTextureSegment, this.BatchSize, this.currentTime)
     this.mesh.material.needsUpdate = true
     if (format == 'etc2') {
       if (!this.compressedTexture) {
-        console.log('applying red material')
         this.mesh.material = new MeshBasicMaterial({ color: new Color(0xff0000) })
         this.mesh.material.needsUpdate = true
         this.compressedTexture = true
@@ -540,7 +530,22 @@ export default class Player {
     }
   }
 
-  removePlayedBuffer(frameNo, segmentNo) {
+  update = () => {
+    if (!this.manifest) {
+      return
+    }
+    this.processFrame()
+    const currentGeometryFrame = getCurrentFrame(this.manifest.geometry.targets[this.geometryTarget], this.currentTime)
+    const currentTextureFrame = getCurrentFrame(this.manifest.texture.targets[this.textureTarget], this.currentTime)
+    const currentTextureSegment = Math.floor(currentTextureFrame / this.BatchSize)
+
+    // geometry frame is rendered these many times. picking 120 as safe bet. screens with >= 120fps are rare
+    const geometryFrameRenderCount = Math.ceil(120 / this.manifest.geometry.targets[this.geometryTarget].frameRate)
+    const textureFrameRenderCount = Math.ceil(120 / (this.manifest.texture.targets[this.textureTarget].frameRate * this.BatchSize))
+    this.removePlayedBuffer(currentGeometryFrame - geometryFrameRenderCount, currentTextureSegment - textureFrameRenderCount)
+  }
+
+  removePlayedBuffer(frameNo: number, segmentNo: number) {
     for (const [key, buffer] of this.meshMap.entries()) {
       if (key < frameNo) {
         buffer.dispose()
@@ -554,17 +559,6 @@ export default class Player {
         this.textureMap.delete(key)
       }
     }
-  }
-
-  update = () => {
-    if (!this.manifest) {
-      return
-    }
-    this.processFrame()
-    const currentGeometryFrame = getCurrentFrame(this.manifest.geometry.targets[this.geometryTarget], this.currentTime)
-    const currentTextureFrame = getCurrentFrame(this.manifest.texture.targets[this.textureTarget], this.currentTime)
-    const currentTextureSegment = Math.floor(currentTextureFrame / this.BatchSize)
-    this.removePlayedBuffer(currentGeometryFrame - 5, currentTextureSegment - 5)
   }
 
   dispose(disposeShader = true): void {
