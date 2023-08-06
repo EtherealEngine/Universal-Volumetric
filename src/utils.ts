@@ -36,6 +36,8 @@ export function isTextureFormatSupported(renderer: WebGLRenderer, format: Textur
  * If the URL paths are absolute, return them.
  */
 export function getAbsoluteURL(manifestURL: string, newSegment: string) {
+  if (newSegment.startsWith('http'))
+    return newSegment
   const manifestURLSegments = manifestURL.split('/')
   manifestURLSegments.pop()
   manifestURLSegments.push(newSegment)
