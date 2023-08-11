@@ -1,10 +1,11 @@
 # Universal Volumetric
 
 ### The open source Universal Volumetric compressed interchange format for streaming mesh sequences. 
+## [READ THE WHITEPAPER](https://go.etherealengine.com/siggraphwp)
 
-[![image](https://github.com/EtherealEngine/Universal-Volumetric/assets/507127/c839fa8b-cfa4-45a7-a1ba-8324631149e4)](https://go.etherealengine.com/siggraphwp)
-
-[Read the whitepaper.](https://go.etherealengine.com/siggraphwp)
+<picture>
+  <img alt="Image Alt Text" src="https://github.com/EtherealEngine/Universal-Volumetric/assets/507127/c839fa8b-cfa4-45a7-a1ba-8324631149e4">
+</picture>
 
 
 ## UVOL 2.0
