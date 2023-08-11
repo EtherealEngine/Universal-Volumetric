@@ -1,6 +1,6 @@
 # Universal Volumetric
 
-The open source Universal Volumetric compressed interchange format for streaming mesh sequences.
+The open source Universal Volumetric compressed interchange format for streaming mesh sequences. [Read the whitepaper. ](https://go.etherealengine.com/siggraphwp)
 
 ## UVOL 2.0
 
