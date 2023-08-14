@@ -1,6 +1,6 @@
 import { WebGLRenderer } from 'three'
 
-import { TextureFileFormat } from './Interfaces'
+import { TextureFormat } from './Interfaces'
 
 /**
  * Utility function to pad 'n' with 'width' number of '0' characters.
@@ -23,11 +23,11 @@ export function countHashChar(URL: string) {
   return count
 }
 
-export function isTextureFormatSupported(renderer: WebGLRenderer, format: TextureFileFormat) {
-  if (format == 'ktx2' || format == 'mp4') {
+export function isTextureFormatSupported(renderer: WebGLRenderer, format: TextureFormat) {
+  if (format == 'ktx2') {
     return true
-  } else if (format == 'etc2') {
-    return renderer.extensions.has('WEBGL_compressed_texture_etc')
+  } else if (format == 'astc/ktx') {
+    return renderer.extensions.has('WEBGL_compressed_texture_astc')
   }
 }
 

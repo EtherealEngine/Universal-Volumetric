@@ -24,18 +24,13 @@
   ],
   "homepage": "https://github.com/EtherealEngine/Universal-Volumetric#readme",
   "dependencies": {
-    "@types/three": "0.153.0",
-    "commander": "^10.0.0",
-    "draco3d": "^1.5.6",
-    "glob": "7.2.0",
-    "ngrok": "^5.0.0-beta.2",
-    "three": "0.153.0",
-    "xmlhttprequest": "^1.8.0"
+    "many-keys-map": "^2.0.1"
   },
   "devDependencies": {
     "@trivago/prettier-plugin-sort-imports": "^4.1.1",
-    "@types/draco3d": "^1.4.2",
+    "@types/three": "^0.155.0",
     "prettier": "^2.8.7",
+    "three": "^0.155.0",
     "ts-loader": "^9.4.2",
     "ts-node": "^10.9.1",
     "typescript": "^5.0.3",
