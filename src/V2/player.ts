@@ -1,5 +1,6 @@
 import ManyKeysMap from 'many-keys-map'
 import {
+  Box3,
   BufferGeometry,
   Color,
   CompressedTexture,
@@ -9,6 +10,7 @@ import {
   Sphere,
   SRGBColorSpace,
   Texture,
+  Vector3,
   WebGLRenderer
 } from 'three'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader'
@@ -74,6 +76,9 @@ export default class Player {
 
         geometryTargets: string[]
         currentGeometryTarget: string
+
+        // cache
+        boundingBox: Box3 | null
         boundingSphere: Sphere | null
 
         textureTypes: TextureType[]
@@ -345,6 +350,7 @@ export default class Player {
       textureTags: textureTags,
       textureTypes: textureTypes,
       currentGeometryTarget: currentGeometryTarget,
+      boundingBox: null,
       boundingSphere: null,
       currentTextureTarget: currentTextureTarget,
       currentTextureTag: currentTextureTag,
@@ -390,9 +396,7 @@ export default class Player {
     this.fetchBuffers(this.startVideo) /** Fetch initial buffers, and the start video */
 
     // @ts-ignore
-    this.trackData.intervalId = setInterval(() => {
-      this.fetchBuffers()
-    }, this.intervalDuration * 1000) // seconds to milliseconds
+    this.trackData.intervalId = setInterval(this.fetchBuffers, this.intervalDuration * 1000) // seconds to milliseconds
   }
 
   startVideo = () => {
@@ -485,6 +489,19 @@ export default class Player {
   decodeDraco = (dracoURL: string, target: string, frameNo: number) => {
     return new Promise((resolve, reject) => {
       this.dracoLoader.load(dracoURL, (geometry: BufferGeometry) => {
+        if (!this.trackData.boundingBox) {
+          geometry.computeBoundingBox()
+
+          const center = new Vector3()
+          geometry.boundingBox.getCenter(center)
+
+          const size = new Vector3()
+          geometry.boundingBox.getSize(size)
+          size.multiplyScalar(1.1) // Increasing size by 10%
+
+          this.trackData.boundingBox = geometry.boundingBox.setFromCenterAndSize(center, size)
+        }
+        geometry.boundingBox = this.trackData.boundingBox
         if (!this.trackData.boundingSphere) {
           geometry.computeBoundingSphere()
           const center = geometry.boundingSphere.center
@@ -582,10 +599,9 @@ export default class Player {
     }
 
     const currentGeometryFrame = this.currentGeometryFrame()
-    const currentTextureFrame = this.currentTextureFrame('baseColor') /* Currently only dealing with baseColor */    
+    const currentTextureFrame = this.currentTextureFrame('baseColor') /* Currently only dealing with baseColor */
     const textureTarget = this.trackData.currentTextureTarget['baseColor']
     const textureTag = this.trackData.currentTextureTag['baseColor']
-
 
     this.removePlayedGeometryBuffer(this.trackData.currentGeometryTarget, currentGeometryFrame - 1)
     this.removePlayedTextureBuffer('baseColor', textureTag, textureTarget, currentTextureFrame - 1)
@@ -608,10 +624,7 @@ export default class Player {
       return
     }
 
-    console.log(currentGeometryFrame, currentTextureFrame)
-
     if (!this.textureMap.has(['baseColor', textureTag, textureTarget, currentTextureFrame])) {
-      console.log(`tFrame: ${currentTextureFrame} not found`)
       this.mesh.geometry = this.meshMap.get([this.trackData.currentGeometryTarget, currentGeometryFrame])
       this.mesh.geometry.attributes.position.needsUpdate = true
 
