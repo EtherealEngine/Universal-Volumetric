@@ -135,8 +135,8 @@ export default class Player {
   }
 
   private getGeometryURL = (frameNo: number) => {
-    const targetData = this.trackData.manifest.output.geometry.targets[this.trackData.currentGeometryTarget]
-    let path = this.trackData.manifest.output.geometry.path
+    const targetData = this.trackData.manifest.geometry.targets[this.trackData.currentGeometryTarget]
+    let path = this.trackData.manifest.geometry.path
     const padWidth = countHashChar(path)
     const TEMPLATE_MAP = {
       '[target]': this.trackData.currentGeometryTarget,
@@ -153,8 +153,8 @@ export default class Player {
     const target = this.trackData.currentTextureTarget[textureType]
     const tag = this.trackData.currentTextureTag[textureType]
 
-    const targetData = this.trackData.manifest.output.texture[textureType].targets[target]
-    let path = this.trackData.manifest.output.texture.path
+    const targetData = this.trackData.manifest.texture[textureType].targets[target]
+    let path = this.trackData.manifest.texture.path
     const padWidth = countHashChar(path)
     const TEMPLATE_MAP = {
       '[target]': target,
@@ -182,7 +182,7 @@ export default class Player {
   }
 
   private calculateGeometryFrame(gTarget: string) {
-    const targetData = this.trackData.manifest.output.geometry.targets[gTarget]
+    const targetData = this.trackData.manifest.geometry.targets[gTarget]
     const frameRate = targetData.frameRate
     return Math.round(this.timeData.currentTime * frameRate)
   }
@@ -194,12 +194,12 @@ export default class Player {
 
   private GeometryFrameCount() {
     const currentTarget = this.trackData.currentGeometryTarget
-    const targetData = this.trackData.manifest.output.geometry.targets[currentTarget]
+    const targetData = this.trackData.manifest.geometry.targets[currentTarget]
     return targetData.frameCount ?? 0
   }
 
   private calculateTextureFrame(textureType: TextureType, tTarget: string) {
-    const targetData = this.trackData.manifest.output.texture[textureType].targets[tTarget]
+    const targetData = this.trackData.manifest.texture[textureType].targets[tTarget]
     const frameRate = targetData.frameRate
     return Math.round(this.timeData.currentTime * frameRate)
   }
@@ -215,33 +215,33 @@ export default class Player {
    */
   private TextureFrameCount(textureType: TextureType = 'baseColor') {
     const currentTarget = this.trackData.currentTextureTarget[textureType]
-    const targetData = this.trackData.manifest.output.texture.baseColor.targets[currentTarget]
+    const targetData = this.trackData.manifest.texture.baseColor.targets[currentTarget]
     return targetData.frameCount ?? 0
   }
 
   playTrack = (_manifest: V2Schema, _manifestFilePath: string, _bufferDuration: number, _intervalDuration: number) => {
-    const hasAudio = typeof _manifest.output.audio !== 'undefined' && _manifest.output.audio.path.length > 0
+    const hasAudio = typeof _manifest.audio !== 'undefined' && _manifest.audio.path.length > 0
 
-    const geometryTargets = Object.keys(_manifest.output.geometry.targets)
+    const geometryTargets = Object.keys(_manifest.geometry.targets)
 
     /**
      * For now choose the target with lowest frameRate
      * TODO: Adaptive target selection
      */
     const currentGeometryTarget = geometryTargets.reduce((prev, curr) => {
-      const prevFrameRate = _manifest.output.geometry.targets[prev].frameRate
-      const currFrameRate = _manifest.output.geometry.targets[curr].frameRate
+      const prevFrameRate = _manifest.geometry.targets[prev].frameRate
+      const currFrameRate = _manifest.geometry.targets[curr].frameRate
       return prevFrameRate < currFrameRate ? prev : curr
     })
 
     const textureTypes: TextureType[] = []
-    Object.keys(_manifest.output.texture).forEach((textureType) => {
+    Object.keys(_manifest.texture).forEach((textureType) => {
       if (textureType !== 'path') textureTypes.push(textureType as TextureType)
     })
 
     const textureTargets: Partial<Record<TextureType, string[]>> = {}
     textureTypes.forEach((textureType) => {
-      textureTargets[textureType] = Object.keys(_manifest.output.texture[textureType as TextureType].targets)
+      textureTargets[textureType] = Object.keys(_manifest.texture[textureType as TextureType].targets)
     })
 
     /**
@@ -252,8 +252,8 @@ export default class Player {
 
     Object.keys(textureTargets).forEach((textureType) => {
       const currentTarget = textureTargets[textureType as TextureType].reduce((prev, curr) => {
-        const prevFormat = _manifest.output.texture[textureType as TextureType].targets[prev].format
-        const currFormat = _manifest.output.texture[textureType as TextureType].targets[curr].format
+        const prevFormat = _manifest.texture[textureType as TextureType].targets[prev].format
+        const currFormat = _manifest.texture[textureType as TextureType].targets[curr].format
 
         const isPrevSupported = isTextureFormatSupported(this.renderer, prevFormat)
         const isCurrSupported = isTextureFormatSupported(this.renderer, currFormat)
@@ -266,8 +266,8 @@ export default class Player {
           return curr
         }
 
-        const prevResolution = _manifest.output.texture[textureType as TextureType].targets[prev].settings.resolution
-        const currResolution = _manifest.output.texture[textureType as TextureType].targets[prev].settings.resolution
+        const prevResolution = _manifest.texture[textureType as TextureType].targets[prev].settings.resolution
+        const currResolution = _manifest.texture[textureType as TextureType].targets[prev].settings.resolution
 
         if (prevResolution !== undefined && currResolution !== undefined) {
           const prevPixels = prevResolution.width * prevResolution.height
@@ -279,8 +279,8 @@ export default class Player {
           }
         }
 
-        const prevFrameRate = _manifest.output.texture[textureType as TextureType].targets[prev].frameRate
-        const currFrameRate = _manifest.output.texture[textureType as TextureType].targets[curr].frameRate
+        const prevFrameRate = _manifest.texture[textureType as TextureType].targets[prev].frameRate
+        const currFrameRate = _manifest.texture[textureType as TextureType].targets[curr].frameRate
 
         if (prevFrameRate < currFrameRate) {
           return prev
@@ -339,6 +339,7 @@ export default class Player {
       })
     })
 
+
     this.trackData = {
       manifestPath: _manifestFilePath,
       manifest: _manifest,
@@ -371,8 +372,8 @@ export default class Player {
     this.intervalDuration = _intervalDuration
 
     if (this.trackData.hasAudio) {
-      let audioURL = this.trackData.manifest.output.audio.path
-      const formats = this.trackData.manifest.output.audio.formats
+      let audioURL = this.trackData.manifest.audio.path
+      const formats = this.trackData.manifest.audio.formats
 
       /* Pick the first  supported audio format */
       const supportedFormat = formats.find((format) => {
@@ -419,7 +420,7 @@ export default class Player {
     const gTarget = this.trackData.currentGeometryTarget
     const currentGFrame = this.currentGeometryFrame()
     const gFramesPerSecond =
-      this.trackData.manifest.output.geometry.targets[this.trackData.currentGeometryTarget].frameRate
+      this.trackData.manifest.geometry.targets[this.trackData.currentGeometryTarget].frameRate
 
     const tTarget: Partial<Record<TextureType, string>> = {}
     this.trackData.textureTypes.forEach((textureType) => {
@@ -437,7 +438,7 @@ export default class Player {
     this.trackData.textureTypes.forEach((textureType) => {
       const target = this.trackData.currentTextureTarget[textureType as TextureType]
       tFramesPerSecond[textureType as TextureType] =
-        this.trackData.manifest.output.texture[textureType as TextureType].targets[target].frameRate
+        this.trackData.manifest.texture[textureType as TextureType].targets[target].frameRate
     })
 
     for (let i = 0; i < this.bufferDuration; i++) {
@@ -517,7 +518,7 @@ export default class Player {
 
   decodeTexture = (textureURL: string, textureType: TextureType, frameNo: number) => {
     const target = this.trackData.currentTextureTarget[textureType]
-    const format = this.trackData.manifest.output.texture[textureType].targets[target].format
+    const format = this.trackData.manifest.texture[textureType].targets[target].format
 
     if (format == 'ktx2') {
       return this.decodeKTX2(textureURL, textureType, frameNo)
@@ -529,7 +530,7 @@ export default class Player {
   decodeASTC = (textureURL: string, textureType: TextureType, frameNo: number) => {
     const target = this.trackData.currentTextureTarget[textureType]
     const tag = this.trackData.currentTextureTag[textureType]
-    const blockSize = (this.trackData.manifest.output.texture[textureType].targets[target] as ASTCTextureTarget)
+    const blockSize = (this.trackData.manifest.texture[textureType].targets[target] as ASTCTextureTarget)
       .settings.blocksize
     const format = ASTC_BLOCK_SIZE_TO_FORMAT[blockSize]
 

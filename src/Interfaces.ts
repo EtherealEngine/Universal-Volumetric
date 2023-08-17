@@ -125,7 +125,7 @@ export interface GeometryTarget {
   /**
    * Total frame count. This information is supplied by the encoder.
    */
-  frameCount?: number
+  frameCount: number
   /**
    * Draco encoding options for the geometry data.
    */
@@ -144,7 +144,7 @@ export interface TextureTarget {
   /**
    * Total frame count. This information is supplied by the encoder.
    */
-  frameCount?: number
+  frameCount: number
 }
 
 export interface KTX2EncodeOptions {
@@ -226,65 +226,63 @@ export interface V2Schema {
       occlusion?: TextureInput | TextureInput[]
     }
   }
-  output: {
-    audio?: {
-      /**
-       * Path template to the output audio data.
-       *
-       * The following template substitutions are supported:
-       *
-       * [ext] - the file extension of the texture, (e.g., ".mp3", ".wav", etc.)
-       *
-       * E.g. "output/audio[ext]"
-       */
-      path: string
-      /**
-       * The audio encoding format.
-       *
-       * The following options are supported:
-       * "mp3" - MP3 audio
-       */
-      formats: AudioFileFormat[]
-    }
-    geometry: {
-      /**
-       * Encoding targets for the geometry data.
-       */
-      targets: Record<string, GeometryTarget>
-      /**
-       * Path template to the output geometry data.
-       *
-       * The following template substitutions are supported:
-       * [target] - one of the geometry targets, defined in the "targets" section
-       * [index] - the index of the frame
-       * [ext] - the file extension of the data
-       *
-       * E.g. "output/geometry_[target]/[index][ext]"
-       */
-      path: string
-    }
-    texture: {
-      baseColor: {
-        targets: Record<string, KTX2TextureTarget | ASTCTextureTarget>
-      }
-      /**
-       * Path template to the output texture data.
-       *
-       * The following template substitutions are supported:
-       * [target] - one of the texture targets, defined in the "targets" section
-       * [tag] - a custom tag for describing texture variants, eg: "default", "red_dress", "blue_dress", etc.
-       * [index] - 0-padded index for each file with the same extension, e.g., ("000001", "000002", etc.)
-       * [ext] - the file extension of the texture, (e.g., ".mp4", ".ktx2", ".astc.ktx", etc.)
-       *
-       * E.g. "output/texture_[target]_[type]_[tag]/[index][ext]""
-       */
-      path: string
-    } & Partial<{
-      [key in OptionalTextureType]: {
-        targets: Record<string, KTX2TextureTarget | ASTCTextureTarget>
-      }
-    }>
+  audio?: {
+    /**
+     * Path template to the output audio data.
+     *
+     * The following template substitutions are supported:
+     *
+     * [ext] - the file extension of the texture, (e.g., ".mp3", ".wav", etc.)
+     *
+     * E.g. "output/audio[ext]"
+     */
+    path: string
+    /**
+     * The audio encoding format.
+     *
+     * The following options are supported:
+     * "mp3" - MP3 audio
+     */
+    formats: AudioFileFormat[]
   }
+  geometry: {
+    /**
+     * Encoding targets for the geometry data.
+     */
+    targets: Record<string, GeometryTarget>
+    /**
+     * Path template to the output geometry data.
+     *
+     * The following template substitutions are supported:
+     * [target] - one of the geometry targets, defined in the "targets" section
+     * [index] - the index of the frame
+     * [ext] - the file extension of the data
+     *
+     * E.g. "output/geometry_[target]/[index][ext]"
+     */
+    path: string
+  }
+  texture: {
+    baseColor: {
+      targets: Record<string, KTX2TextureTarget | ASTCTextureTarget>
+    }
+    /**
+     * Path template to the output texture data.
+     *
+     * The following template substitutions are supported:
+     * [target] - one of the texture targets, defined in the "targets" section
+     * [tag] - a custom tag for describing texture variants, eg: "default", "red_dress", "blue_dress", etc.
+     * [index] - 0-padded index for each file with the same extension, e.g., ("000001", "000002", etc.)
+     * [ext] - the file extension of the texture, (e.g., ".mp4", ".ktx2", ".astc.ktx", etc.)
+     *
+     * E.g. "output/texture_[target]_[type]_[tag]/[index][ext]""
+     */
+    path: string
+  } & Partial<{
+    [key in OptionalTextureType]: {
+      targets: Record<string, KTX2TextureTarget | ASTCTextureTarget>
+    }
+  }>
 }
 
 export type UVOLManifestSchema = V1Schema | V2Schema
