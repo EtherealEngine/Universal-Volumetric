@@ -89,6 +89,8 @@ export default class Player {
         currentTextureTag: Partial<Record<TextureType, string>>
 
         intervalId: number
+
+        stats: number[]
       }
     | undefined
 
@@ -134,6 +136,7 @@ export default class Player {
     // })
     this.failMaterial = new MeshBasicMaterial({ color: new Color(0x049ef4) })
     this.meshMaterial = (this.mesh.material as Material).clone()
+    console.log(this.meshMaterial)
   }
 
   private getGeometryURL = (frameNo: number) => {
@@ -244,63 +247,44 @@ export default class Player {
 
     const textureTargets: Partial<Record<TextureType, string[]>> = {}
     textureTypes.forEach((textureType) => {
-      textureTargets[textureType] = Object.keys(_manifest.texture[textureType as TextureType].targets)
+      const allTargets = Object.keys(_manifest.texture[textureType as TextureType].targets)
+      const supportedTargets: string[] = []
+      allTargets.forEach((target) => {
+        const format = _manifest.texture[textureType as TextureType].targets[target].format
+        if (isTextureFormatSupported(this.renderer, format)) {
+          supportedTargets.push(target)
+        }
+      })
+
+      supportedTargets.sort((a, b) => {
+        const aResolution = _manifest.texture[textureType as TextureType].targets[a].settings.resolution
+        const bResolution = _manifest.texture[textureType as TextureType].targets[b].settings.resolution
+        const aFrameRate = _manifest.texture[textureType as TextureType].targets[a].frameRate
+        const bFrameRate = _manifest.texture[textureType as TextureType].targets[b].frameRate
+        const aFormat = _manifest.texture[textureType as TextureType].targets[a].format
+        const bFormat = _manifest.texture[textureType as TextureType].targets[b].format
+        const aPriority = TEXTURE_FORMAT_PRIORITY[aFormat]
+        const bPriority = TEXTURE_FORMAT_PRIORITY[bFormat]
+        const aPixelPerSecond = aResolution.width * aResolution.height * aFrameRate
+        const bPixelPerSecond = bResolution.width * bResolution.height * bFrameRate
+
+        /**
+         * Sort by priority first
+         */
+        if (aPriority !== bPriority) {
+          return bPriority - aPriority
+        }
+
+        return aPixelPerSecond - bPixelPerSecond
+      })
+
+      textureTargets[textureType] = supportedTargets
     })
 
-    /**
-     * For now choose the target with lowest frameRate
-     * TODO: Adaptive target selection
-     */
     const currentTextureTarget: Partial<Record<TextureType, string>> = {}
 
     Object.keys(textureTargets).forEach((textureType) => {
-      const currentTarget = textureTargets[textureType as TextureType].reduce((prev, curr) => {
-        const prevFormat = _manifest.texture[textureType as TextureType].targets[prev].format
-        const currFormat = _manifest.texture[textureType as TextureType].targets[curr].format
-
-        const isPrevSupported = isTextureFormatSupported(this.renderer, prevFormat)
-        const isCurrSupported = isTextureFormatSupported(this.renderer, currFormat)
-
-        if (!isPrevSupported && !isCurrSupported) {
-          return prev // although not useful
-        } else if (isPrevSupported && !isCurrSupported) {
-          return prev
-        } else if (!isPrevSupported && isCurrSupported) {
-          return curr
-        }
-
-        const prevResolution = _manifest.texture[textureType as TextureType].targets[prev].settings.resolution
-        const currResolution = _manifest.texture[textureType as TextureType].targets[prev].settings.resolution
-
-        if (prevResolution !== undefined && currResolution !== undefined) {
-          const prevPixels = prevResolution.width * prevResolution.height
-          const currPixels = currResolution.width * currResolution.height
-          if (prevPixels < currPixels) {
-            return prev
-          } else if (currPixels < prevPixels) {
-            return curr
-          }
-        }
-
-        const prevFrameRate = _manifest.texture[textureType as TextureType].targets[prev].frameRate
-        const currFrameRate = _manifest.texture[textureType as TextureType].targets[curr].frameRate
-
-        if (prevFrameRate < currFrameRate) {
-          return prev
-        } else if (prevFrameRate > currFrameRate) {
-          return curr
-        }
-
-        const prevPriority = TEXTURE_FORMAT_PRIORITY[prevFormat]
-        const currPriority = TEXTURE_FORMAT_PRIORITY[currFormat]
-
-        if (prevPriority >= currPriority) {
-          return prev
-        } else if (currPriority > prevPriority) {
-          return curr
-        }
-      })
-      currentTextureTarget[textureType as TextureType] = currentTarget
+      currentTextureTarget[textureType as TextureType] = textureTargets[textureType as TextureType][0]
     })
 
     const textureTags: Partial<Record<TextureType, string[]>> = {}
@@ -357,7 +341,8 @@ export default class Player {
       boundingSphere: null,
       currentTextureTarget: currentTextureTarget,
       currentTextureTag: currentTextureTag,
-      intervalId: -1 // Set this below
+      intervalId: -1, // Set this below
+      stats: []
     }
 
     console.log(this.trackData)
@@ -420,6 +405,10 @@ export default class Player {
     const promises = []
 
     const gTarget = this.trackData.currentGeometryTarget
+
+    const oldLastGeometryFrame = this.trackData.lastRequestedGeometryFrame[gTarget]
+    const startTime = Date.now()
+
     const currentGFrame = this.currentGeometryFrame()
     const gFramesPerSecond = this.trackData.manifest.geometry.targets[this.trackData.currentGeometryTarget].frameRate
 
@@ -480,12 +469,55 @@ export default class Player {
       })
     }
 
-    if (callback) {
-      Promise.all(promises).then(() => {
+    Promise.all(promises).then(() => {
+      const endTime = Date.now()
+      const fetchedFrames = this.trackData.lastRequestedGeometryFrame[gTarget] - oldLastGeometryFrame
+      const playTime = fetchedFrames / gFramesPerSecond
+      const fetchTime = (endTime - startTime) / 1000
+      if (playTime > 0) {
+        this.trackData.stats.push(fetchTime / playTime)
+        this.adjustTextureTarget()
+      }
+
+      if (callback) {
         console.log('Initial buffers fetched. Starting playback...')
         callback()
-      })
+      }
+    })
+  }
+
+  adjustTextureTarget = () => {
+    if (this.trackData.stats.length < 3) return
+    const mean = this.trackData.stats.reduce((a, b) => a + b, 0) / this.trackData.stats.length
+
+    if (0 <= mean && mean <= 0.3) {
+      // Probably very comfortably at current target.
+      // Lets try to increase the target
+      const currentTargetIndex = this.trackData.textureTargets['baseColor'].indexOf(
+        this.trackData.currentTextureTarget['baseColor']
+      )
+      if (currentTargetIndex < this.trackData.textureTargets['baseColor'].length - 1) {
+        this.trackData.currentTextureTarget['baseColor'] =
+          this.trackData.textureTargets['baseColor'][currentTargetIndex + 1]
+        console.log('Updated target to : ', this.trackData.currentTextureTarget['baseColor'])
+      }
+    } else if (0.3 <= mean && mean <= 0.6) {
+      // Probably at the edge of current target.
+      // Do not change target
+    } else {
+      // Struggling to keep up with current target.
+      // Lets try to decrease the target
+      const currentTargetIndex = this.trackData.textureTargets['baseColor'].indexOf(
+        this.trackData.currentTextureTarget['baseColor']
+      )
+      if (currentTargetIndex > 0) {
+        this.trackData.currentTextureTarget['baseColor'] =
+          this.trackData.textureTargets['baseColor'][currentTargetIndex - 1]
+        console.log('Updated target to : ', this.trackData.currentTextureTarget['baseColor'])
+      }
     }
+
+    this.trackData.stats.length = 0
   }
 
   decodeDraco = (dracoURL: string, target: string, frameNo: number) => {
@@ -621,7 +653,7 @@ export default class Player {
 
     if (this.trackData.hasAudio && this.audio.ended) {
       clearInterval(this.trackData.intervalId)
-      this.dispose()
+      this.dispose(false) // dont dispose loaders
       this.onTrackEnd()
       return
     }
@@ -638,12 +670,12 @@ export default class Player {
     const textureTarget = this.trackData.currentTextureTarget['baseColor']
     const textureTag = this.trackData.currentTextureTag['baseColor']
 
-    this.removePlayedGeometryBuffer(this.trackData.currentGeometryTarget, currentGeometryFrame - 1)
-    this.removePlayedTextureBuffer('baseColor', textureTag, textureTarget, currentTextureFrame - 1)
+    this.removePlayedGeometryBuffer([this.trackData.currentGeometryTarget, currentGeometryFrame - 1])
+    this.removePlayedTextureBuffer(['baseColor', textureTag, textureTarget, currentTextureFrame - 1])
 
     if (currentGeometryFrame >= this.GeometryFrameCount() - 1) {
       clearInterval(this.trackData.intervalId)
-      this.dispose()
+      this.dispose(false) // dont dispose loaders
       this.timeData.isClockPaused = true
       this.onTrackEnd()
       return
@@ -694,37 +726,43 @@ export default class Player {
     this.processFrame()
   }
 
-  removePlayedGeometryBuffer = (target: string, frameNo: number) => {
-    if (this.meshMap.has([target, frameNo])) {
-      const buffer = this.meshMap.get([target, frameNo])
+  removePlayedGeometryBuffer = (key: [target: string, frameNo: number]) => {
+    if (this.meshMap.has(key)) {
+      const buffer = this.meshMap.get(key)
       buffer.dispose()
-      this.meshMap.delete([target, frameNo])
+      this.meshMap.delete(key)
     }
   }
 
-  removePlayedTextureBuffer = (textureType: TextureType, tag: string, target: string, frameNo: number) => {
-    if (this.textureMap.has([textureType, tag, target, frameNo])) {
-      const buffer = this.textureMap.get([textureType, tag, target, frameNo])
+  removePlayedTextureBuffer = (key: [textureType: TextureType, tag: string, target: string, frameNo: number]) => {
+    if (this.textureMap.has(key)) {
+      const buffer = this.textureMap.get(key)
       buffer.dispose()
-      this.textureMap.delete([textureType, tag, target, frameNo])
+      this.textureMap.delete(key)
     }
   }
 
-  dispose(): void {
-    for (const [[gTarget, frameNo], buffer] of this.meshMap.entries()) {
-      this.meshMap.delete([gTarget, frameNo])
+  dispose(disposeLoaders = true): void {
+    for (const [key, buffer] of this.meshMap.entries()) {
+      this.meshMap.delete(key)
       if (buffer && buffer instanceof BufferGeometry) {
         buffer.dispose()
       }
     }
     this.meshMap.clear()
 
-    for (const [[textureType, tag, target, frameNo], buffer] of this.textureMap.entries()) {
-      this.textureMap.delete([textureType, tag, target, frameNo])
+    for (const [key, buffer] of this.textureMap.entries()) {
+      this.textureMap.delete(key)
       if (buffer && buffer.isTexture) {
         buffer.dispose()
       }
     }
     this.textureMap.clear()
+
+    if (disposeLoaders) {
+      console.log('Disposing Loaders')
+      this.dracoLoader.dispose()
+      this.ktx2Loader.dispose()
+    }
   }
 }
