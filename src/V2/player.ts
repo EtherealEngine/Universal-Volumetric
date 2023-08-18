@@ -53,6 +53,7 @@ export default class Player {
   private dracoLoader: DRACOLoader
   private ktxLoader: KTXLoader
   private ktx2Loader: KTX2Loader
+  private meshMaterial: Material
   private failMaterial: Material
   private meshMap: ManyKeysMap<[string, number], BufferGeometry> = new ManyKeysMap() // (Target, FrameNo) => BufferGeometry
   private textureMap: ManyKeysMap<[TextureType, string, string, number], Texture> = new ManyKeysMap() // (Type, Tag, Target, FrameNo) => Texture
@@ -132,6 +133,7 @@ export default class Player {
     //   refractionRatio: 1
     // })
     this.failMaterial = new MeshBasicMaterial({ color: new Color(0x049ef4) })
+    this.meshMaterial = (this.mesh.material as Material).clone()
   }
 
   private getGeometryURL = (frameNo: number) => {
@@ -198,6 +200,7 @@ export default class Player {
     return targetData.frameCount ?? 0
   }
 
+  /* All tags have same frame number. So it's not needed */
   private calculateTextureFrame(textureType: TextureType, tTarget: string) {
     const targetData = this.trackData.manifest.texture[textureType].targets[tTarget]
     const frameRate = targetData.frameRate
@@ -339,7 +342,6 @@ export default class Player {
       })
     })
 
-
     this.trackData = {
       manifestPath: _manifestFilePath,
       manifest: _manifest,
@@ -419,8 +421,7 @@ export default class Player {
 
     const gTarget = this.trackData.currentGeometryTarget
     const currentGFrame = this.currentGeometryFrame()
-    const gFramesPerSecond =
-      this.trackData.manifest.geometry.targets[this.trackData.currentGeometryTarget].frameRate
+    const gFramesPerSecond = this.trackData.manifest.geometry.targets[this.trackData.currentGeometryTarget].frameRate
 
     const tTarget: Partial<Record<TextureType, string>> = {}
     this.trackData.textureTypes.forEach((textureType) => {
@@ -530,8 +531,8 @@ export default class Player {
   decodeASTC = (textureURL: string, textureType: TextureType, frameNo: number) => {
     const target = this.trackData.currentTextureTarget[textureType]
     const tag = this.trackData.currentTextureTag[textureType]
-    const blockSize = (this.trackData.manifest.texture[textureType].targets[target] as ASTCTextureTarget)
-      .settings.blocksize
+    const blockSize = (this.trackData.manifest.texture[textureType].targets[target] as ASTCTextureTarget).settings
+      .blocksize
     const format = ASTC_BLOCK_SIZE_TO_FORMAT[blockSize]
 
     return new Promise((resolve, reject) => {
@@ -576,6 +577,39 @@ export default class Player {
         this.timeData.totalPausedDuration += Date.now() - this.timeData.pausedTime
         this.timeData.isClockPaused = false
       }
+    }
+  }
+
+  updateGeometry(geometry: BufferGeometry) {
+    if (this.mesh.geometry.uuid != geometry.uuid) {
+      this.mesh.geometry = geometry
+      this.mesh.geometry.attributes.position.needsUpdate = true
+    }
+  }
+
+  updateTexture(texture: Texture) {
+    let isMeshChanged = false
+    if ((this.mesh.material as Material).uuid == this.failMaterial.uuid) {
+      this.mesh.material = this.meshMaterial
+      isMeshChanged = true
+    }
+
+    if (
+      (this.mesh.material as MeshBasicMaterial).map == null ||
+      (this.mesh.material as MeshBasicMaterial).map.uuid != texture.uuid
+    ) {
+      ;(this.mesh.material as MeshBasicMaterial).map = texture
+      texture.needsUpdate = true
+      if (!isMeshChanged) {
+        ;(this.mesh.material as MeshBasicMaterial).needsUpdate = true
+      }
+    }
+  }
+
+  updateMaterial(material: Material) {
+    if ((this.mesh.material as Material).uuid != material.uuid) {
+      this.mesh.material = material
+      this.mesh.material.needsUpdate = true
     }
   }
 
@@ -626,29 +660,29 @@ export default class Player {
     }
 
     if (!this.textureMap.has(['baseColor', textureTag, textureTarget, currentTextureFrame])) {
-      this.mesh.geometry = this.meshMap.get([this.trackData.currentGeometryTarget, currentGeometryFrame])
-      this.mesh.geometry.attributes.position.needsUpdate = true
+      this.updateGeometry(this.meshMap.get([this.trackData.currentGeometryTarget, currentGeometryFrame]))
 
-      this.mesh.material = this.failMaterial
-      this.mesh.material.needsUpdate = true
+      // If texture is not available, search for other targets in defaultTag.
+      // Reasoning: Applying a known tag is better than applying failMaterial
+      const fallbackTag = 'default'
+
+      for (let i = 0; i < this.trackData.textureTargets.baseColor.length; i++) {
+        const target = this.trackData.textureTargets.baseColor[i]
+        const failCurrentTextureFrame = this.calculateTextureFrame('baseColor', target)
+        if (this.textureMap.has(['baseColor', fallbackTag, target, failCurrentTextureFrame])) {
+          this.updateTexture(this.textureMap.get(['baseColor', fallbackTag, target, failCurrentTextureFrame]))
+          this.onFrameShow?.(currentGeometryFrame)
+          return
+        }
+      }
+
+      // If player reached here, it did not find texture in any target. So, apply failMaterial
+      this.updateMaterial(this.failMaterial)
       this.onFrameShow?.(currentGeometryFrame)
       return
     } else {
-      this.mesh.geometry = this.meshMap.get([this.trackData.currentGeometryTarget, currentGeometryFrame])
-      this.mesh.geometry.attributes.position.needsUpdate = true
-
-      // @ts-ignore
-      this.mesh.material.color = new Color(0xffffff)
-
-      // @ts-ignore
-      this.mesh.material.map = this.textureMap.get(['baseColor', textureTag, textureTarget, currentTextureFrame])
-
-      // @ts-ignore
-      this.mesh.material.map.needsUpdate = true
-
-      // @ts-ignore
-      this.mesh.material.needsUpdate = true
-
+      this.updateGeometry(this.meshMap.get([this.trackData.currentGeometryTarget, currentGeometryFrame]))
+      this.updateTexture(this.textureMap.get(['baseColor', textureTag, textureTarget, currentTextureFrame]))
       this.onFrameShow?.(currentGeometryFrame)
     }
   }
