@@ -3,23 +3,25 @@ import {
   Box3,
   BufferGeometry,
   Color,
-  CompressedTexture,
+  CompressedPixelFormat,
   Material,
   Mesh,
   MeshBasicMaterial,
   Sphere,
-  SRGBColorSpace,
   Texture,
   Vector3,
   WebGLRenderer
 } from 'three'
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader'
 import { KTXLoader } from 'three/examples/jsm/loaders/KTXLoader'
 
 import {
   ASTC_BLOCK_SIZE_TO_FORMAT,
-  ASTCTextureTarget,
+  GEOMETRY_FORMAT_PRIORITY,
+  GLBEncodeOptions,
   onFrameShowCallback,
   onMeshBufferingCallback,
   onTrackEndCallback,
@@ -27,7 +29,20 @@ import {
   V2Schema
 } from '../Interfaces'
 import { FORMATS_TO_EXT, TEXTURE_FORMAT_PRIORITY } from '../Interfaces'
-import { countHashChar, getAbsoluteURL, isTextureFormatSupported, pad } from '../utils'
+import {
+  GeometryFrameCount as _GeometryFrameCount,
+  TextureFrameCount as _TextureFrameCount,
+  calculateGeometryFrame,
+  calculateTextureFrame,
+  decodeGeometry,
+  decodeTexture,
+  getAbsoluteURL,
+  getGeometryURL,
+  getTextureURL,
+  isTextureFormatSupported,
+  updateGeometry,
+  updateTexture
+} from './utils'
 
 export interface fetchBuffersCallback {
   (): void
@@ -50,6 +65,8 @@ export default class Player {
   public mesh: Mesh
 
   private audio: HTMLAudioElement | HTMLVideoElement
+  private gltfLoader: GLTFLoader
+  private meshoptDecoder: typeof MeshoptDecoder
   private dracoLoader: DRACOLoader
   private ktxLoader: KTXLoader
   private ktx2Loader: KTX2Loader
@@ -126,6 +143,11 @@ export default class Player {
     this.ktx2Loader.setTranscoderPath('https://unpkg.com/three@0.153.0/examples/jsm/libs/basis/')
     this.ktx2Loader.detectSupport(this.renderer)
 
+    this.meshoptDecoder = MeshoptDecoder
+    // @ts-ignore
+    this.meshoptDecoder.useWorkers(4)
+    this.gltfLoader = new GLTFLoader().setMeshoptDecoder(this.meshoptDecoder)
+
     // this.failMaterial = new MeshPhongMaterial({
     //   color: new Color(0x049ef4),
     //   emissive: new Color(0x000000),
@@ -139,42 +161,6 @@ export default class Player {
     console.log(this.meshMaterial)
   }
 
-  private getGeometryURL = (frameNo: number) => {
-    const targetData = this.trackData.manifest.geometry.targets[this.trackData.currentGeometryTarget]
-    let path = this.trackData.manifest.geometry.path
-    const padWidth = countHashChar(path)
-    const TEMPLATE_MAP = {
-      '[target]': this.trackData.currentGeometryTarget,
-      '[ext]': FORMATS_TO_EXT[targetData.format]
-    }
-    TEMPLATE_MAP[`[${'#'.repeat(padWidth)}]`] = pad(frameNo, padWidth)
-    Object.keys(TEMPLATE_MAP).forEach((key) => {
-      path = path.replace(key, TEMPLATE_MAP[key])
-    })
-    return getAbsoluteURL(this.trackData.manifestPath, path)
-  }
-
-  private getTextureURL = (frameNo: number, textureType: TextureType) => {
-    const target = this.trackData.currentTextureTarget[textureType]
-    const tag = this.trackData.currentTextureTag[textureType]
-
-    const targetData = this.trackData.manifest.texture[textureType].targets[target]
-    let path = this.trackData.manifest.texture.path
-    const padWidth = countHashChar(path)
-    const TEMPLATE_MAP = {
-      '[target]': target,
-      '[type]': textureType as string,
-      '[tag]': tag,
-      '[ext]': FORMATS_TO_EXT[targetData.format]
-    }
-    TEMPLATE_MAP[`[${'#'.repeat(padWidth)}]`] = pad(frameNo, padWidth)
-
-    Object.keys(TEMPLATE_MAP).forEach((key) => {
-      path = path.replace(key, TEMPLATE_MAP[key])
-    })
-    return getAbsoluteURL(this.trackData.manifestPath, path)
-  }
-
   get paused() {
     if (this.trackData === undefined || this.timeData === undefined) {
       return true
@@ -186,33 +172,19 @@ export default class Player {
     }
   }
 
-  private calculateGeometryFrame(gTarget: string) {
-    const targetData = this.trackData.manifest.geometry.targets[gTarget]
-    const frameRate = targetData.frameRate
-    return Math.round(this.timeData.currentTime * frameRate)
-  }
-
   private currentGeometryFrame() {
     const currentTarget = this.trackData.currentGeometryTarget
-    return this.calculateGeometryFrame(currentTarget)
+    return calculateGeometryFrame(this.trackData.manifest, currentTarget, this.timeData.currentTime)
   }
 
   private GeometryFrameCount() {
     const currentTarget = this.trackData.currentGeometryTarget
-    const targetData = this.trackData.manifest.geometry.targets[currentTarget]
-    return targetData.frameCount ?? 0
-  }
-
-  /* All tags have same frame number. So it's not needed */
-  private calculateTextureFrame(textureType: TextureType, tTarget: string) {
-    const targetData = this.trackData.manifest.texture[textureType].targets[tTarget]
-    const frameRate = targetData.frameRate
-    return Math.round(this.timeData.currentTime * frameRate)
+    return _GeometryFrameCount(this.trackData.manifest, currentTarget)
   }
 
   private currentTextureFrame(textureType: TextureType) {
     const currentTarget = this.trackData.currentTextureTarget[textureType]
-    return this.calculateTextureFrame(textureType, currentTarget)
+    return calculateTextureFrame(this.trackData.manifest, textureType, currentTarget, this.timeData.currentTime)
   }
 
   /**
@@ -221,24 +193,38 @@ export default class Player {
    */
   private TextureFrameCount(textureType: TextureType = 'baseColor') {
     const currentTarget = this.trackData.currentTextureTarget[textureType]
-    const targetData = this.trackData.manifest.texture.baseColor.targets[currentTarget]
-    return targetData.frameCount ?? 0
+    return _TextureFrameCount(this.trackData.manifest, textureType, currentTarget)
   }
 
   playTrack = (_manifest: V2Schema, _manifestFilePath: string, _bufferDuration: number, _intervalDuration: number) => {
     const hasAudio = typeof _manifest.audio !== 'undefined' && _manifest.audio.path.length > 0
 
-    const geometryTargets = Object.keys(_manifest.geometry.targets)
-
     /**
-     * For now choose the target with lowest frameRate
-     * TODO: Adaptive target selection
+     * TODO: Adaptive geometry target selection
      */
-    const currentGeometryTarget = geometryTargets.reduce((prev, curr) => {
-      const prevFrameRate = _manifest.geometry.targets[prev].frameRate
-      const currFrameRate = _manifest.geometry.targets[curr].frameRate
-      return prevFrameRate < currFrameRate ? prev : curr
+    const geometryTargets = Object.keys(_manifest.geometry.targets)
+    geometryTargets.sort((a, b) => {
+      const aFormat = _manifest.geometry.targets[a].format
+      const bFormat = _manifest.geometry.targets[b].format
+      const aPriority = GEOMETRY_FORMAT_PRIORITY[aFormat]
+      const bPriority = GEOMETRY_FORMAT_PRIORITY[bFormat]
+      if (aPriority !== bPriority) {
+        return bPriority - aPriority
+      }
+      if (aFormat === 'glb' && bFormat === 'glb') {
+        const aRatio = (_manifest.geometry.targets[a].settings as GLBEncodeOptions).simplificationRatio ?? 1
+        const bRatio = (_manifest.geometry.targets[b].settings as GLBEncodeOptions).simplificationRatio ?? 1
+        if (aRatio !== bRatio) {
+          return bRatio - aRatio
+        }
+      }
+
+      const aFrameRate = _manifest.geometry.targets[a].frameRate
+      const bFrameRate = _manifest.geometry.targets[b].frameRate
+      return aFrameRate - bFrameRate
     })
+
+    const currentGeometryTarget = geometryTargets[0]
 
     const textureTypes: TextureType[] = []
     Object.keys(_manifest.texture).forEach((textureType) => {
@@ -280,6 +266,7 @@ export default class Player {
 
       textureTargets[textureType] = supportedTargets
     })
+    console.log(textureTargets)
 
     const currentTextureTarget: Partial<Record<TextureType, string>> = {}
 
@@ -396,6 +383,59 @@ export default class Player {
     }
   }
 
+  fetchGeometry = async (gTarget: string, frameNo: number) => {
+    const geometryURL = getGeometryURL(this.trackData.manifest, this.trackData.manifestPath, gTarget, frameNo)
+    const geometry = await decodeGeometry(
+      this.dracoLoader,
+      this.gltfLoader,
+      this.trackData.manifest.geometry.targets[gTarget].format,
+      geometryURL
+    )
+
+    if (!this.trackData.boundingBox) {
+      geometry.computeBoundingBox()
+
+      const center = new Vector3()
+      geometry.boundingBox.getCenter(center)
+
+      const size = new Vector3()
+      geometry.boundingBox.getSize(size)
+      size.multiplyScalar(1.1) // Increasing size by 10%
+
+      this.trackData.boundingBox = geometry.boundingBox.setFromCenterAndSize(center, size)
+    }
+    geometry.boundingBox = this.trackData.boundingBox
+
+    if (!this.trackData.boundingSphere) {
+      geometry.computeBoundingSphere()
+      const center = geometry.boundingSphere.center
+      const radius = geometry.boundingSphere.radius * 1.1 // Increasing radius by 10%
+      this.trackData.boundingSphere = geometry.boundingSphere.set(center, radius)
+    }
+    geometry.boundingSphere = this.trackData.boundingSphere
+
+    this.meshMap.set([gTarget, frameNo], geometry)
+  }
+
+  fetchTexture = async (textureType: TextureType, textureTag: string, textureTarget: string, frameNo: number) => {
+    const textureURL = getTextureURL(
+      this.trackData.manifest,
+      this.trackData.manifestPath,
+      textureType,
+      textureTag,
+      textureTarget,
+      frameNo
+    )
+    const targetData = this.trackData.manifest.texture[textureType].targets[textureTarget]
+    const format = targetData.format
+    let astcFormat: CompressedPixelFormat | undefined
+    if (format === 'astc/ktx') {
+      astcFormat = ASTC_BLOCK_SIZE_TO_FORMAT[targetData.settings.blocksize]
+    }
+    const texture = await decodeTexture(this.ktx2Loader, this.ktxLoader, targetData.format, textureURL, astcFormat)
+    this.textureMap.set([textureType, textureTag, textureTarget, frameNo], texture)
+  }
+
   /**
    * Fetches buffers according to Leaky Bucket algorithm.
    * If meshMap has less than required meshes, we keep fetching meshes. Otherwise, we keep fetching meshes.
@@ -441,8 +481,7 @@ export default class Player {
         let currentRequestingFrame = this.trackData.lastRequestedGeometryFrame[gTarget] + 1
         this.trackData.lastRequestedGeometryFrame[gTarget] = geometryRequestEnd
         for (; currentRequestingFrame <= geometryRequestEnd; currentRequestingFrame++) {
-          const dracoURL = this.getGeometryURL(currentRequestingFrame)
-          promises.push(this.decodeDraco(dracoURL, gTarget, currentRequestingFrame))
+          promises.push(this.fetchGeometry(gTarget, currentRequestingFrame))
         }
       }
 
@@ -462,8 +501,7 @@ export default class Player {
           let currentRequestingFrame = this.trackData.lastRequestedTextureFrame[textureType][currentTarget] + 1
           this.trackData.lastRequestedTextureFrame[textureType][currentTarget] = textureRequestEnd
           for (; currentRequestingFrame <= textureRequestEnd; currentRequestingFrame++) {
-            const textureURL = this.getTextureURL(currentRequestingFrame, textureType)
-            promises.push(this.decodeTexture(textureURL, textureType, currentRequestingFrame))
+            promises.push(this.fetchTexture(textureType, currentTag, currentTarget, currentRequestingFrame))
           }
         }
       })
@@ -520,78 +558,6 @@ export default class Player {
     this.trackData.stats.length = 0
   }
 
-  decodeDraco = (dracoURL: string, target: string, frameNo: number) => {
-    return new Promise((resolve, reject) => {
-      this.dracoLoader.load(dracoURL, (geometry: BufferGeometry) => {
-        if (!this.trackData.boundingBox) {
-          geometry.computeBoundingBox()
-
-          const center = new Vector3()
-          geometry.boundingBox.getCenter(center)
-
-          const size = new Vector3()
-          geometry.boundingBox.getSize(size)
-          size.multiplyScalar(1.1) // Increasing size by 10%
-
-          this.trackData.boundingBox = geometry.boundingBox.setFromCenterAndSize(center, size)
-        }
-        geometry.boundingBox = this.trackData.boundingBox
-        if (!this.trackData.boundingSphere) {
-          geometry.computeBoundingSphere()
-          const center = geometry.boundingSphere.center
-          const radius = geometry.boundingSphere.radius * 1.1 // Increasing radius by 10%
-          this.trackData.boundingSphere = geometry.boundingSphere.set(center, radius)
-        }
-        geometry.boundingSphere = this.trackData.boundingSphere
-        this.meshMap.set([target, frameNo], geometry)
-        resolve(true)
-      })
-    })
-  }
-
-  decodeTexture = (textureURL: string, textureType: TextureType, frameNo: number) => {
-    const target = this.trackData.currentTextureTarget[textureType]
-    const format = this.trackData.manifest.texture[textureType].targets[target].format
-
-    if (format == 'ktx2') {
-      return this.decodeKTX2(textureURL, textureType, frameNo)
-    } else if (format == 'astc/ktx') {
-      return this.decodeASTC(textureURL, textureType, frameNo)
-    }
-  }
-
-  decodeASTC = (textureURL: string, textureType: TextureType, frameNo: number) => {
-    const target = this.trackData.currentTextureTarget[textureType]
-    const tag = this.trackData.currentTextureTag[textureType]
-    const blockSize = (this.trackData.manifest.texture[textureType].targets[target] as ASTCTextureTarget).settings
-      .blocksize
-    const format = ASTC_BLOCK_SIZE_TO_FORMAT[blockSize]
-
-    return new Promise((resolve, reject) => {
-      this.ktxLoader.load(textureURL, (texture: any) => {
-        texture.format = format
-        texture.colorSpace = SRGBColorSpace
-        texture.needsUpdate = true
-        this.textureMap.set([textureType, tag, target, frameNo], texture)
-        resolve(true)
-      })
-    })
-  }
-
-  decodeKTX2 = (textureURL: string, textureType: TextureType, frameNo: number) => {
-    const target = this.trackData.currentTextureTarget[textureType]
-    const tag = this.trackData.currentTextureTag[textureType]
-
-    return new Promise((resolve, reject) => {
-      this.ktx2Loader.load(textureURL, (texture: CompressedTexture) => {
-        texture.colorSpace = SRGBColorSpace
-        texture.needsUpdate = true
-        this.textureMap.set([textureType, tag, target, frameNo], texture)
-        resolve(true)
-      })
-    })
-  }
-
   pause = () => {
     if (this.trackData.hasAudio) {
       this.audio.pause()
@@ -608,32 +574,6 @@ export default class Player {
       if (this.timeData.isClockPaused) {
         this.timeData.totalPausedDuration += Date.now() - this.timeData.pausedTime
         this.timeData.isClockPaused = false
-      }
-    }
-  }
-
-  updateGeometry(geometry: BufferGeometry) {
-    if (this.mesh.geometry.uuid != geometry.uuid) {
-      this.mesh.geometry = geometry
-      this.mesh.geometry.attributes.position.needsUpdate = true
-    }
-  }
-
-  updateTexture(texture: Texture) {
-    let isMeshChanged = false
-    if ((this.mesh.material as Material).uuid == this.failMaterial.uuid) {
-      this.mesh.material = this.meshMaterial
-      isMeshChanged = true
-    }
-
-    if (
-      (this.mesh.material as MeshBasicMaterial).map == null ||
-      (this.mesh.material as MeshBasicMaterial).map.uuid != texture.uuid
-    ) {
-      ;(this.mesh.material as MeshBasicMaterial).map = texture
-      texture.needsUpdate = true
-      if (!isMeshChanged) {
-        ;(this.mesh.material as MeshBasicMaterial).needsUpdate = true
       }
     }
   }
@@ -692,7 +632,7 @@ export default class Player {
     }
 
     if (!this.textureMap.has(['baseColor', textureTag, textureTarget, currentTextureFrame])) {
-      this.updateGeometry(this.meshMap.get([this.trackData.currentGeometryTarget, currentGeometryFrame]))
+      updateGeometry(this.mesh, this.meshMap.get([this.trackData.currentGeometryTarget, currentGeometryFrame]))
 
       // If texture is not available, search for other targets in defaultTag.
       // Reasoning: Applying a known tag is better than applying failMaterial
@@ -700,9 +640,19 @@ export default class Player {
 
       for (let i = 0; i < this.trackData.textureTargets.baseColor.length; i++) {
         const target = this.trackData.textureTargets.baseColor[i]
-        const failCurrentTextureFrame = this.calculateTextureFrame('baseColor', target)
+        const failCurrentTextureFrame = calculateTextureFrame(
+          this.trackData.manifest,
+          'baseColor',
+          target,
+          this.timeData.currentTime
+        )
         if (this.textureMap.has(['baseColor', fallbackTag, target, failCurrentTextureFrame])) {
-          this.updateTexture(this.textureMap.get(['baseColor', fallbackTag, target, failCurrentTextureFrame]))
+          updateTexture(
+            this.mesh,
+            this.textureMap.get(['baseColor', fallbackTag, target, failCurrentTextureFrame]),
+            this.meshMaterial,
+            this.failMaterial
+          )
           this.onFrameShow?.(currentGeometryFrame)
           return
         }
@@ -713,8 +663,13 @@ export default class Player {
       this.onFrameShow?.(currentGeometryFrame)
       return
     } else {
-      this.updateGeometry(this.meshMap.get([this.trackData.currentGeometryTarget, currentGeometryFrame]))
-      this.updateTexture(this.textureMap.get(['baseColor', textureTag, textureTarget, currentTextureFrame]))
+      updateGeometry(this.mesh, this.meshMap.get([this.trackData.currentGeometryTarget, currentGeometryFrame]))
+      updateTexture(
+        this.mesh,
+        this.textureMap.get(['baseColor', textureTag, textureTarget, currentTextureFrame]),
+        this.meshMaterial,
+        this.failMaterial
+      )
       this.onFrameShow?.(currentGeometryFrame)
     }
   }

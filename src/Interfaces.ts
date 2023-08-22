@@ -85,8 +85,8 @@ export interface TextureInput {
   tag?: string
 }
 
-export type AudioFileFormat = 'mp3' | 'wav' | 'ogg'
-export type GeometryFormat = 'draco'
+export type AudioFileFormat = 'mp3' | 'wav'
+export type GeometryFormat = 'draco' | 'glb'
 export type TextureFormat = 'ktx2' | 'astc/ktx'
 export type OptionalTextureType = 'normal' | 'metallicRoughness' | 'emissive' | 'occlusion'
 export type TextureType = 'baseColor' | OptionalTextureType
@@ -113,6 +113,19 @@ export interface DracoEncodeOptions {
    */
   genericQuantizationBits?: number
 }
+
+export interface GLBEncodeOptions {
+  /**
+   * simplify meshes targeting triangle count ratio R (default: 1; R should be between 0 and 1)
+   * @default 1
+   */
+  simplificationRatio?: number
+  /**
+   * aggressively simplify to the target ratio disregarding quality
+   * @default false
+   */
+  simplifyAggressively?: boolean
+}
 export interface GeometryTarget {
   /**
    * Geometry encoding format.
@@ -126,10 +139,23 @@ export interface GeometryTarget {
    * Total frame count. This information is supplied by the encoder.
    */
   frameCount: number
+}
+
+export interface DRACOTarget extends GeometryTarget {
+  format: 'draco'
   /**
    * Draco encoding options for the geometry data.
    */
   settings: DracoEncodeOptions
+}
+
+export interface GLBTarget extends GeometryTarget {
+  format: 'glb'
+  /**
+   * GLB encoding options for the geometry data.
+   * @default {simplificationRatio: 1, simplifyAggressively: false}
+   */
+  settings: GLBEncodeOptions
 }
 
 export interface TextureTarget {
@@ -198,10 +224,6 @@ export interface ASTCEncodeOptions {
     | '12x12'
   quality: '-fastest' | '-fast' | '-medium' | '-thorough' | '-verythorough' | '-exhaustive' | number
   yflip?: boolean
-  /**
-   * Resize images to @e width X @e height.
-   * If not specified, uses the image as is.
-   */
   resolution: {
     width: number
     height: number
@@ -214,7 +236,7 @@ export interface ASTCTextureTarget extends TextureTarget {
 }
 
 export interface V2Schema {
-  version: string // "2.0"
+  version: 'v2'
   input: {
     audio?: AudioInput
     geometry: GeometryInput | GeometryInput[]
@@ -241,7 +263,7 @@ export interface V2Schema {
      * The audio encoding format.
      *
      * The following options are supported:
-     * "mp3" - MP3 audio
+     * "mp3", "wav" - MP3 audio
      */
     formats: AudioFileFormat[]
   }
@@ -249,7 +271,7 @@ export interface V2Schema {
     /**
      * Encoding targets for the geometry data.
      */
-    targets: Record<string, GeometryTarget>
+    targets: Record<string, GLBTarget | DRACOTarget>
     /**
      * Path template to the output geometry data.
      *
@@ -311,8 +333,14 @@ export const FORMATS_TO_EXT = {
   mp3: '.mp3',
   wav: '.wav',
   draco: '.drc',
+  glb: '.glb',
   ktx2: '.ktx2',
   'astc/ktx': '.ktx'
+}
+
+export const GEOMETRY_FORMAT_PRIORITY = {
+  draco: 0,
+  glb: 1
 }
 
 // more value => more priority
