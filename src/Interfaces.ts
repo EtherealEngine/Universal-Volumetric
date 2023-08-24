@@ -139,6 +139,12 @@ export interface GeometryTarget {
    * Total frame count. This information is supplied by the encoder.
    */
   frameCount: number
+  /**
+   * Scale of the model.
+   * This is read by the player, actual geometry data is not scaled.
+   * @default 1
+   */
+  scale: number
 }
 
 export interface DRACOTarget extends GeometryTarget {
@@ -266,6 +272,12 @@ export interface V2Schema {
      * "mp3", "wav" - MP3 audio
      */
     formats: AudioFileFormat[]
+    /**
+     * PlayBack rate.
+     * This is read by the player, actual playbackRate data is not changed.
+     * @default 1
+     */
+    playbackRate: number
   }
   geometry: {
     /**

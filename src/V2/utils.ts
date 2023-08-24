@@ -155,7 +155,10 @@ const decodeGLB = (loader: GLTFLoader, geometryURL: string): Promise<BufferGeome
           // @ts-ignore
           if (node.material && 'map' in node.material) {
             // @ts-ignore
-            node.material.map.dispose()
+            if ('map' in node.material) {
+              // @ts-ignore
+              node.material.map.dispose()
+            }
             // @ts-ignore
           } else if (node.material) {
             // @ts-ignore
@@ -192,7 +195,11 @@ const decodeKTX2 = (loader: KTX2Loader, textureURL: string): Promise<CompressedT
   })
 }
 
-const decodeASTC = (loader: KTXLoader, textureURL: string, astcFormat: CompressedPixelFormat): Promise<CompressedTexture> => {
+const decodeASTC = (
+  loader: KTXLoader,
+  textureURL: string,
+  astcFormat: CompressedPixelFormat
+): Promise<CompressedTexture> => {
   return new Promise((resolve, reject) => {
     loader.load(textureURL, (texture) => {
       texture.colorSpace = SRGBColorSpace

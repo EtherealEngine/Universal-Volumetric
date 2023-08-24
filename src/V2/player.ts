@@ -372,10 +372,13 @@ export default class Player {
 
     // @ts-ignore
     this.trackData.intervalId = setInterval(this.fetchBuffers, this.intervalDuration * 1000) // seconds to milliseconds
+
+    this.mesh.scale.setScalar(this.trackData.manifest.geometry.targets[currentGeometryTarget].scale)
   }
 
   startVideo = () => {
     if (this.trackData.hasAudio) {
+      this.audio.playbackRate = this.trackData.manifest.audio.playbackRate
       this.audio.play()
     } else {
       this.timeData.startTime = Date.now()
