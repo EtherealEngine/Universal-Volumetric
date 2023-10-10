@@ -1,5 +1,6 @@
 import {
   BufferGeometry,
+  Color,
   Float32BufferAttribute,
   LinearFilter,
   Mesh,
@@ -7,8 +8,7 @@ import {
   sRGBEncoding,
   Texture,
   Uint16BufferAttribute,
-  WebGLRenderer,
-  Color
+  WebGLRenderer
 } from 'three'
 
 import { onFrameShowCallback, onMeshBufferingCallback, onTrackEndCallback, V1Schema } from '../Interfaces'
@@ -158,7 +158,7 @@ export default class Player {
       this._videoTexture = new Texture(this.videoCtx.canvas)
     }
 
-    this._videoTexture.encoding = sRGBEncoding
+    this._videoTexture.colorSpace = 'srgb'
 
     this.material.map = this._videoTexture
 
